@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    container_name: conquer_db
+    environment:
+      POSTGRES_USER: conquer
+      POSTGRES_PASSWORD: conquerpass
+      POSTGRES_DB: conquer
+    ports:
+      - "5433:5432"
+    volumes:
+      - conquer_pg:/var/lib/postgresql/data
+
+volumes:
+  conquer_pg:

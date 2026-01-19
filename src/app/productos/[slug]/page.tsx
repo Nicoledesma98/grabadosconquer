@@ -1,0 +1,42 @@
+export const runtime = "nodejs";
+
+import { prisma } from "@/lib/prisma";
+import ProductDetailClient from "./product-detail-client";
+import { notFound } from "next/navigation";
+
+export default async function ProductoDetallePage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+
+  const product = await prisma.product.findUnique({
+    where: { slug },
+    include: {
+      images: { orderBy: { sort: "asc" } },
+      priceTiers: { orderBy: { minQty: "asc" } },
+    },
+  });
+
+  if (!product || !product.active) return notFound();
+
+  return (
+    <main className="p-6">
+      <ProductDetailClient
+        product={{
+          id: product.id,
+          slug: product.slug,
+          name: product.name,
+          description: product.description,
+          basePrice: product.basePrice,
+          images: product.images.map((i) => ({ url: i.url, alt: i.alt })),
+          priceTiers: product.priceTiers.map((t) => ({
+            minQty: t.minQty,
+            price: t.price,
+          })),
+        }}
+      />
+    </main>
+  );
+}
