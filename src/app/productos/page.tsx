@@ -40,7 +40,7 @@ export default async function ProductosPage({
 
   return (
     <main className="p-6">
-      <h1 className="text-2xl font-semibold">Productos</h1>
+      <h1 className="text-2xl text-center font-semibold">Productos</h1>
 
       {(q || cat) && (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-neutral-600">
@@ -69,7 +69,7 @@ export default async function ProductosPage({
           No se encontraron productos.
         </div>
       ) : (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {products.map((p) => {
             const img = p.images[0]?.url;
             const firstPrice = p.priceTiers[0]?.price ?? p.basePrice ?? 0;
@@ -90,7 +90,7 @@ export default async function ProductosPage({
                   </div>
 
                   <div className="mt-3">
-                    <div className="font-medium">{p.name}</div>
+                    <div className="font-medium text-center">{p.name}</div>
                     <div className="text-sm text-neutral-600 mt-1">
                       Desde <span className="font-semibold">${firstPrice}</span>
                     </div>
