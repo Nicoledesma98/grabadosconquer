@@ -34,8 +34,10 @@ export default async function ProductosPage({
       images: { orderBy: { sort: "asc" }, take: 1 },
       priceTiers: { orderBy: { minQty: "asc" } },
       categories: { orderBy: { name: "asc" } }, // ✅
+      variants: { orderBy : { createdAt: "asc"}},
     },
   });
+
 
 
   return (

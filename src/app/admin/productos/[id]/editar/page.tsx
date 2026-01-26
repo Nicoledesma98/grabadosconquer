@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import ProductVariantsPanel from "@/components/admin/ProductVariantsPanel";
+
 
 type Category = { id: string; name: string; slug: string };
 
@@ -438,6 +440,7 @@ export default function AdminEditarProductoPage() {
                         })}
                     </div>
                 </div>
+                <ProductVariantsPanel productId={id} />
                 <div className="grid gap-2">
                     <label className="text-sm text-neutral-700">Price Tiers (precio por cantidad)</label>
 

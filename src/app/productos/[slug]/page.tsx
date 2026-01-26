@@ -16,6 +16,7 @@ export default async function ProductoDetallePage({
     include: {
       images: { orderBy: { sort: "asc" } },
       priceTiers: { orderBy: { minQty: "asc" } },
+      variants: { orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -35,6 +36,15 @@ export default async function ProductoDetallePage({
             minQty: t.minQty,
             price: t.price,
           })),
+          variants: product.variants.map((v) => ({
+            id: v.id,
+            sku: v.sku,
+            colorName: v.colorName,
+            colorHex: v.colorHex,
+            stock: v.stock,
+            priceOverride: v.priceOverride ?? null,
+          })),
+          allowedMethods: product.allowedMethods,
         }}
       />
     </main>

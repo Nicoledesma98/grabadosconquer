@@ -19,3 +19,16 @@ body {
   background: var(--conquer-white);
   color: var(--conquer-navy);
 }
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 1.8s linear infinite;
+}
+@keyframes pulse-soft {
+  0%,100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.96); opacity: 0.75; }
+}
+.animate-pulse-soft { animation: pulse-soft 1.2s ease-in-out infinite; }

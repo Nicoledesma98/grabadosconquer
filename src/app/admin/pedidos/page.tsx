@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import OrderStatusSelect from "@/components/admin/OrderStatusSelect";
+
 
 export const runtime = "nodejs";
 
@@ -45,8 +47,9 @@ export default async function AdminPedidosPage() {
                                     <div className="text-sm text-neutral-600">
                                         {o.createdAt.toLocaleString("es-AR")}
                                     </div>
+                                    <div className="text-sm text-neutral-600">{o.customerEmail}</div>
                                 </div>
-
+                                <OrderStatusSelect orderId={o.id} initialStatus={o.status} />
                                 <div className="text-right">
                                     <div className="text-sm text-neutral-600">Total</div>
                                     <div className="text-xl font-semibold">{formatARS(o.total)}</div>

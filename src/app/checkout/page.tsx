@@ -83,6 +83,14 @@ export default function CheckoutPage() {
                         unitPrice: i.unitPrice,
                         productName: i.name,
                         productSlug: i.slug,
+
+                        variantId: i.variantId ?? null,
+                        variantSku: i.variantSku ?? null,
+                        colorName: i.variantName ?? i.colorName ?? null,
+                        colorHex: i.colorHex ?? null,
+
+                        method: i.method ?? null,
+                        notes: i.notes ?? null,
                     })),
                 }),
             });
@@ -173,6 +181,24 @@ export default function CheckoutPage() {
                                 <div key={i.productId} className="flex items-start justify-between gap-3">
                                     <div>
                                         <div className="font-medium">{i.name}</div>
+                                        {(i as any).variantName && (
+                                            <div className="mt-1 text-xs text-neutral-600 flex items-center gap-2">
+                                                <span>Color: <b>{(i as any).variantName}</b></span>
+                                                {(i as any).colorHex && (
+                                                    <span className="h-3 w-3 rounded-full border" style={{ backgroundColor: (i as any).colorHex }} />
+                                                )}
+                                                {(i as any).variantSku && (
+                                                    <span className="text-neutral-400">({(i as any).variantSku})</span>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {(i as any).method && (
+                                            <div className="mt-1 text-xs text-neutral-600">
+                                                Personalización: <b>{(i as any).method}</b>
+                                            </div>
+                                        )}
+
                                         <div className="text-sm text-neutral-600">
                                             {i.qty} × {formatARS(i.unitPrice)}
                                         </div>
