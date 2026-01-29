@@ -21,6 +21,8 @@ export default async function ProductoDetallePage({
   });
 
   if (!product || !product.active) return notFound();
+  console.log("ALLOWED_METHODS:", product.allowedMethods);
+
 
   return (
     <main className="p-6">

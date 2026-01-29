@@ -10,6 +10,20 @@ function toSlug(input: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+// ✅ métodos válidos (coinciden con tu enum de Prisma)
+const ALLOWED_METHODS = ["DTF", "DTG", "FULL_COLOR", "LASER"] as const;
+type PersonalizationMethod = (typeof ALLOWED_METHODS)[number];
+
+function normalizeAllowedMethods(input: any): PersonalizationMethod[] {
+  if (!Array.isArray(input)) return [];
+  // filtramos solo valores válidos y evitamos duplicados
+  const set = new Set<PersonalizationMethod>();
+  for (const v of input) {
+    if (ALLOWED_METHODS.includes(v)) set.add(v);
+  }
+  return Array.from(set);
+}
+
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
 
@@ -19,6 +33,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       images: { orderBy: { sort: "asc" } },
       priceTiers: { orderBy: { minQty: "asc" } },
       categories: { orderBy: { name: "asc" } },
+      variants: { orderBy: { createdAt: "asc" } }, // (opcional) si lo necesitás en admin
     },
   });
 
@@ -26,6 +41,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
+  // ✅ ya viene allowedMethods porque está en Product
   return Response.json(product);
 }
 
@@ -45,6 +61,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const imageUrl = body.imageUrl ? String(body.imageUrl).trim() : "";
   const categoryIds: string[] = Array.isArray(body.categoryIds) ? body.categoryIds : [];
 
+  // ✅ NUEVO
+  const allowedMethods = normalizeAllowedMethods(body.allowedMethods);
+
   if (!name) return Response.json({ error: "Name is required" }, { status: 400 });
 
   const slug = slugRaw ? toSlug(slugRaw) : toSlug(name);
@@ -63,6 +82,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (exists) return Response.json({ error: "Slug already exists" }, { status: 409 });
   }
 
+  // id de la primera imagen (si existe) para el upsert
+  const firstImg = await prisma.productImage.findFirst({
+    where: { productId: id },
+    select: { id: true },
+    orderBy: { sort: "asc" },
+  });
+
   const updated = await prisma.product.update({
     where: { id },
     data: {
@@ -71,6 +97,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       description,
       basePrice: basePrice == null ? null : Math.round(basePrice),
       active,
+
+      // ✅ NUEVO: guardamos métodos permitidos
+      allowedMethods,
 
       // Reemplazamos categorías por las seleccionadas
       categories: { set: categoryIds.map((cid) => ({ id: cid })) },
@@ -81,7 +110,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
             images: {
               upsert: [
                 {
-                  where: { id: (await prisma.productImage.findFirst({ where: { productId: id }, select: { id: true } }))?.id ?? "__nope__" },
+                  where: { id: firstImg?.id ?? "__nope__" },
                   update: { url: imageUrl, alt: name },
                   create: { url: imageUrl, alt: name, sort: 0 },
                 },
@@ -90,7 +119,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           }
         : {}),
     },
-    select: { id: true },
+    select: { id: true, allowedMethods: true }, // ✅ devolvemos para confirmar
   });
 
   return Response.json(updated);

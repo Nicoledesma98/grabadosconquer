@@ -6,6 +6,7 @@ import ProductVariantsPanel from "@/components/admin/ProductVariantsPanel";
 
 
 type Category = { id: string; name: string; slug: string };
+type PersonalizationMethod = "DTF" | "DTG" | "FULL_COLOR" | "LASER";
 
 type ProductDTO = {
     id: string;
@@ -17,6 +18,7 @@ type ProductDTO = {
     images: { id: string; url: string; alt: string | null; sort: number }[];
     categories: { id: string; name: string; slug: string }[];
     priceTiers: { id: string; minQty: number; price: number }[];
+    allowedMethods?: PersonalizationMethod[];
 
 };
 
@@ -40,7 +42,7 @@ export default function AdminEditarProductoPage() {
     const [imageUrl, setImageUrl] = useState("");
     const [categories, setCategories] = useState<Category[]>([]);
     const [categoryIds, setCategoryIds] = useState<string[]>([]);
-
+    const [allowedMethods, setAllowedMethods] = useState<PersonalizationMethod[]>([]);
     const disabled = useMemo(() => saving || !name.trim(), [saving, name]);
 
     useEffect(() => {
@@ -62,7 +64,7 @@ export default function AdminEditarProductoPage() {
             const cats = (await cRes.json()) as Category[];
 
             setProduct(p);
-
+            setAllowedMethods((p.allowedMethods ?? []) as any);
             setName(p.name);
             setSlug(p.slug);
             setDescription(p.description ?? "");
@@ -112,6 +114,11 @@ export default function AdminEditarProductoPage() {
         setProduct(p);
         setTierMinQty("1");
         setTierPrice("");
+    }
+    function toggleMethod(m: PersonalizationMethod) {
+        setAllowedMethods((prev) =>
+            prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]
+        );
     }
 
     async function deleteTier(tierId: string) {
@@ -250,6 +257,7 @@ export default function AdminEditarProductoPage() {
                     active,
                     imageUrl: imageUrl.trim() || null,
                     categoryIds,
+                    allowedMethods,
                 }),
             });
 
@@ -440,6 +448,36 @@ export default function AdminEditarProductoPage() {
                         })}
                     </div>
                 </div>
+                <div className="grid gap-2">
+                    <label className="text-sm text-neutral-700">Personalización permitida</label>
+
+                    <div className="flex flex-wrap gap-2">
+                        {(["DTF", "DTG", "FULL_COLOR", "LASER"] as const).map((m) => {
+                            const on = allowedMethods.includes(m);
+                            const label =
+                                m === "FULL_COLOR" ? "Full color" :
+                                    m === "LASER" ? "Láser" :
+                                        m;
+
+                            return (
+                                <button
+                                    key={m}
+                                    type="button"
+                                    onClick={() => toggleMethod(m)}
+                                    className={`px-3 py-1.5 rounded-full border text-sm ${on ? "bg-black text-white" : "hover:bg-neutral-50"
+                                        }`}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="text-xs text-neutral-500">
+                        Elegí solo los métodos que apliquen a este producto (ej: solo Láser).
+                    </div>
+                </div>
+
                 <ProductVariantsPanel productId={id} />
                 <div className="grid gap-2">
                     <label className="text-sm text-neutral-700">Price Tiers (precio por cantidad)</label>

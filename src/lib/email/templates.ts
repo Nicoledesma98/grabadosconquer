@@ -6,7 +6,24 @@ type OrderItemEmail = {
   lineTotal: number;
   productName: string;
   productSlug: string;
+
+  variantSku? : string | null;
+  colorName?: string | null;
+  colorHex?: string | null;
+  method?: "DTF" | "DTG" | "FULL_COLOR" | "LASER" | string | null;
+  notes?: string | null;
 };
+type OrderUploadEmail = {
+  type: string; //"TEXT" | "PDF" | "IMAGE" | "DOC" | "OTHER"
+  url? : string | null;
+  text? : string | null;
+  originalName?: string | null;
+
+};
+type PaymentMethodEmail = "MERCADO_PAGO" | "CASH" | "TRANSFER" | "COORDINATE" | string;
+type ShippingMethodEmail = "PICKUP" | "MOTO" | "OCA" | "VIACARGO" | string;
+type MotoZoneEmail = "CABA" | "GBA1" | "GBA2" | string;
+type InvoiceTypeEmail = "A" | "B" | string;
 
 type OrderEmailData = {
   id: string;
@@ -15,10 +32,21 @@ type OrderEmailData = {
   customerEmail?: string | null;
   customerPhone?: string | null;
   items: OrderItemEmail[];
-  subtotal: number;
+  subtotalNet: number;
+  vatRate: number,
+  vatAmount: number;
   shipping: number;
+  paymentSurcharge: number;
   total: number;
+  paymentMethod?: PaymentMethodEmail;
+  shippingMethod?: ShippingMethodEmail;
+  motoZone?: MotoZoneEmail | null;
+
+  invoiceType?: InvoiceTypeEmail;
+  invoiceCuit?: string | null;
+  invoiceBusinessName?: string | null;
   createdAt?: Date | string;
+  uploads?: OrderUploadEmail[];
 };
 
 function formatARS(value: number) {
@@ -36,6 +64,70 @@ function escapeHtml(s: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+function prettyMethod(m?: string | null) {
+  const x = String(m || "").toUpperCase();
+  if (x === "FULL_COLOR") return "Full color";
+  if (x === "LASER") return "Láser";
+  if (x === "DTF") return "DTF";
+  if (x === "DTG") return "DTG";
+  return m || "-";
+}
+function prettyPayment(m?: string | null) {
+  const x = String(m || "").toUpperCase();
+  if(x === "CASH") return "Efectivo";
+  if(x === "TRANSFER") return "Transferencia";
+  if(x === "MERCADO_PAGO") return "Mercado Pago";
+  if(x === "COORDINATE") return "Coordinar con vendedor";
+  return m || "-";
+}
+function prettyShipping(m?: string | null) {
+  const x = String(m || "").toUpperCase();
+  if (x === "PICKUP") return "Retiro";
+  if (x === "MOTO") return "Moto";
+  if (x === "OCA") return "OCA";
+  if (x === "VIACARGO") return "Vía Cargo";
+  return m || "-";
+}
+
+function uploadsBox(uploads?: OrderUploadEmail[]) {
+  if (!uploads?.length) return "";
+
+  const rows = uploads
+    .map((u) => {
+      const type = escapeHtml(String(u.type || "-"));
+      const text = u.text ? escapeHtml(String(u.text)) : "";
+      const url = u.url ? String(u.url) : "";
+      const name = escapeHtml(String(u.originalName || "Abrir archivo"));
+
+      const value = text
+        ? `<div style="color:${COLORS.navy};font-size:13px;line-height:1.45;">${text}</div>`
+        : url
+        ? `<a href="${url}" target="_blank" rel="noreferrer"
+             style="color:${COLORS.orange};text-decoration:underline;font-weight:800;">
+             ${name}
+           </a>`
+        : `<span style="color:${COLORS.gray};">-</span>`;
+
+      return `
+        <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-top:1px solid ${COLORS.border};">
+          <div style="min-width:90px;font-size:12px;font-weight:900;color:${COLORS.navy};">
+            ${type}
+          </div>
+          <div style="flex:1;">${value}</div>
+        </div>
+      `;
+    })
+    .join("");
+
+  return `
+    <div style="margin-top:14px;border:1px solid ${COLORS.border};border-radius:18px;overflow:hidden;">
+      <div style="background:${COLORS.pink};padding:10px 12px;font-weight:900;color:${COLORS.navy};">
+        Personalización
+      </div>
+      ${rows}
+    </div>
+  `;
 }
 
 // Colores Conquer
@@ -148,13 +240,40 @@ function itemsTable(items: OrderItemEmail[]) {
   const rows = items
     .map((it) => {
       const name = escapeHtml(it.productName);
-      const slug = escapeHtml(it.productSlug);
+const slug = escapeHtml(it.productSlug);
+
+const colorLine =
+  it.colorName || it.variantSku
+    ? `<div style="margin-top:6px;font-size:12px;color:${COLORS.gray};">
+         Color: <b style="color:${COLORS.navy};">${escapeHtml(String(it.colorName || "-"))}</b>
+         ${it.variantSku ? ` <span style="color:${COLORS.gray};">(${escapeHtml(String(it.variantSku))})</span>` : ""}
+       </div>`
+    : "";
+
+const methodLine =
+  it.method
+    ? `<div style="margin-top:4px;font-size:12px;color:${COLORS.gray};">
+         Personalización: <b style="color:${COLORS.navy};">${escapeHtml(prettyMethod(it.method))}</b>
+       </div>`
+    : "";
+
+const notesLine =
+  it.notes
+    ? `<div style="margin-top:4px;font-size:12px;color:${COLORS.gray};">
+         Nota: <span style="color:${COLORS.navy};">${escapeHtml(String(it.notes))}</span>
+       </div>`
+    : "";
+
       return `
       <tr>
         <td style="padding:10px 8px;border-bottom:1px solid ${COLORS.border};font-size:13px;color:${COLORS.navy};">
-          <div style="font-weight:800;">${name}</div>
-          <div style="font-size:12px;color:${COLORS.gray};">${slug}</div>
-        </td>
+  <div style="font-weight:800;">${name}</div>
+  <div style="font-size:12px;color:${COLORS.gray};">${slug}</div>
+  ${colorLine}
+  ${methodLine}
+  ${notesLine}
+</td>
+
         <td style="padding:10px 8px;border-bottom:1px solid ${COLORS.border};font-size:13px;color:${COLORS.navy};text-align:center;white-space:nowrap;">
           ${it.qty}×
         </td>
@@ -197,22 +316,70 @@ function itemsTable(items: OrderItemEmail[]) {
     </table>
   </div>`;
 }
+function methodsBox(o: OrderEmailData) {
+  const ship = prettyShipping(o.shippingMethod || null);
+  const pay = prettyPayment(o.paymentMethod || null);
 
-function totalsBox(subtotal: number, shipping: number, total: number) {
+  const moto = o.shippingMethod === "MOTO" && o.motoZone ? ` (${escapeHtml(String(o.motoZone))})` : "";
+  const invoice =
+    String(o.invoiceType || "B").toUpperCase() === "A"
+      ? `Factura A — CUIT: ${escapeHtml(String(o.invoiceCuit || "-"))} — Razón social: ${escapeHtml(
+          String(o.invoiceBusinessName || "-")
+        )}`
+      : "Factura B";
+
+  return `
+    <div style="margin-top:14px;border:1px solid ${COLORS.border};border-radius:18px;overflow:hidden;">
+      <div style="background:${COLORS.pink};padding:10px 12px;font-weight:900;color:${COLORS.navy};">
+        Datos del pedido
+      </div>
+
+      <div style="padding:12px 12px;border-top:1px solid ${COLORS.border};font-size:13px;color:${COLORS.navy};">
+        <div style="display:flex;justify-content:space-between;gap:10px;">
+          <span style="color:${COLORS.gray};">Pago</span>
+          <span style="font-weight:900;">${escapeHtml(pay)}</span>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;gap:10px;margin-top:8px;">
+          <span style="color:${COLORS.gray};">Envío</span>
+          <span style="font-weight:900;">${escapeHtml(ship)}${moto}</span>
+        </div>
+
+        <div style="margin-top:10px;color:${COLORS.gray};font-size:12px;line-height:1.4;">
+          ${invoice}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function totalsBox(o: OrderEmailData) {
   return `
   <div style="margin-top:14px;border:1px solid ${COLORS.border};border-radius:18px;padding:12px 14px;">
     <div style="display:flex;justify-content:space-between;color:${COLORS.navy};font-size:13px;">
-      <span>Subtotal</span><span>${formatARS(subtotal)}</span>
+      <span>Neto</span><span>${formatARS(o.subtotalNet)}</span>
     </div>
+
     <div style="display:flex;justify-content:space-between;color:${COLORS.navy};font-size:13px;margin-top:6px;">
-      <span>Envío</span><span>${formatARS(shipping)}</span>
+      <span>IVA (${o.vatRate}%)</span><span>${formatARS(o.vatAmount)}</span>
     </div>
+
+    <div style="display:flex;justify-content:space-between;color:${COLORS.navy};font-size:13px;margin-top:6px;">
+      <span>Envío</span><span>${formatARS(o.shipping)}</span>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;color:${COLORS.navy};font-size:13px;margin-top:6px;">
+      <span>Recargo</span><span>${formatARS(o.paymentSurcharge)}</span>
+    </div>
+
     <div style="height:1px;background:${COLORS.border};margin:10px 0;"></div>
+
     <div style="display:flex;justify-content:space-between;color:${COLORS.navy};font-size:16px;font-weight:900;">
-      <span>Total</span><span>${formatARS(total)}</span>
+      <span>Total</span><span>${formatARS(o.total)}</span>
     </div>
   </div>`;
 }
+
 
 export function renderOrderCreatedEmail(o: OrderEmailData) {
   const subtitle = `Pedido ${o.id}${o.createdAt ? " • " + new Date(o.createdAt).toLocaleString("es-AR") : ""}`;
@@ -227,9 +394,13 @@ export function renderOrderCreatedEmail(o: OrderEmailData) {
     </div>
 
     <div style="margin-top:14px;">
-      ${itemsTable(o.items)}
-      ${totalsBox(o.subtotal, o.shipping, o.total)}
-    </div>
+ ${itemsTable(o.items)}
+${methodsBox(o)}
+${totalsBox(o)}
+${uploadsBox(o.uploads)}
+
+</div>
+
   `;
 
   const appUrl = process.env.APP_URL || "http://localhost:3000";
@@ -276,8 +447,10 @@ export function renderOrderStatusEmail(o: OrderEmailData & { nextStatus: string 
     </div>
 
     <div style="margin-top:14px;">
-      ${itemsTable(o.items)}
-      ${totalsBox(o.subtotal, o.shipping, o.total)}
+       ${itemsTable(o.items)}
+${methodsBox(o)}
+${totalsBox(o)}
+${uploadsBox(o.uploads)}
     </div>
   `;
 

@@ -24,6 +24,7 @@ enum UploadType {
   PDF
   DOC
   TEXT
+  PAYMENT_PROOF
   OTHER
 }
 enum PersonalizationMethod {
@@ -32,7 +33,27 @@ enum PersonalizationMethod {
   FULL_COLOR
   LASER
 }
-
+enum PaymentMethod {
+  MERCADO_PAGO
+  CASH
+  TRANSFER
+  COORDINATE
+}
+enum InvoiceType {
+  A
+  B
+}
+enum ShippingMethod {
+  PICKUP
+  MOTO
+  OCA
+  VIACARGO
+}
+enum MotoZone {
+  CABA
+  GBA1
+  GBA2
+}
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -56,6 +77,10 @@ model Product {
   description String?
   active      Boolean @default(true)
   basePrice   Int?
+  weightGrams Int?
+  lenghtMm Int?
+  widthMm Int?
+  heightMm Int?
   
   allowedMethods PersonalizationMethod[] @default([])
 
@@ -173,13 +198,29 @@ model Order {
   userId String?
   status OrderStatus @default(PENDING)
 
-  subtotal Int @default(0)
+  subtotalNet Int @default(0)
+  vatRate Int @default(21) //porcentaje
+  vatAmount Int @default(0)
   shipping Int @default(0)
   total    Int @default(0)
+
+  paymentMethod PaymentMethod @default(CASH)
+  paymentSurcharge Int @default(0)
 
   customerName  String?
   customerEmail String?
   customerPhone String?
+  //Factura
+  invoiceType InvoiceType @default(B)
+  invoiceCuit String?
+  invoiceBusinessName String?
+  //Envio
+  shippingMethod ShippingMethod @default(PICKUP)
+  motoZone MotoZone?
+  shipPostalCode String?
+  shipStreet String?
+  shipNumber String?
+  shipApartment String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
