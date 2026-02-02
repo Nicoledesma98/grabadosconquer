@@ -103,15 +103,19 @@ export default function NavbarClient({ role }: Props) {
       {/* ROW 2: navegación principal */}
       <div className="bg-white">
         <div className="mx-auto flex h-12 max-w-6xl items-center justify-center gap-8 px-4 text-sm text-conquer-navy">
-          <Link href="/productos" className="hover:text-conquer-orange">
+          
+          <Link href="/" className="hover:text-conquer-orange">
+            Inicio
+          </Link><Link href="/productos" className="hover:text-conquer-orange">
             Productos
+          </Link>
+          <Link href="/como-comprar" className="hover:text-conquer-orange">
+            Cómo comprar
           </Link>
           <Link href="/contacto" className="hover:text-conquer-orange">
             Contacto
           </Link>
-          <Link href="/ayuda" className="hover:text-conquer-orange">
-            Ayuda
-          </Link>
+          
         </div>
       </div>
     </header>

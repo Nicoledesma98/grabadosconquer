@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCart } from "@/store/cart";
 import { useRouter } from "next/navigation";
+import { MOTO_PRICES, MotoZone, getMotoLocalitiesByZone, getMotoFromLocality } from "@/lib/shipping/moto";
+
 
 function formatARS(value: number) {
   return new Intl.NumberFormat("es-AR", {
@@ -15,15 +17,9 @@ function formatARS(value: number) {
 const VAT_RATE = 0.21;
 
 type ShippingMethod = "PICKUP" | "MOTO" | "OCA" | "VIACARGO";
-type MotoZone = "CABA" | "GBA1" | "GBA2";
 type PaymentMethod = "MERCADO_PAGO" | "CASH" | "TRANSFER" | "COORDINATE";
 type InvoiceType = "A" | "B";
 
-const MOTO_PRICES: Record<MotoZone, number> = {
-  CABA: 4500,
-  GBA1: 6500,
-  GBA2: 8500,
-};
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -46,8 +42,10 @@ export default function CheckoutPage() {
 
   // Envío
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("PICKUP");
-  const [motoZone, setMotoZone] = useState<MotoZone>("CABA");
 
+  const [motoZone, setMotoZone] = useState<MotoZone>("CABA");
+  const [motoLocality, setMotoLocality] = useState<string>("");
+  const motoData = useMemo(() => getMotoLocalitiesByZone(), []);
   const [shipPostalCode, setShipPostalCode] = useState("");
   const [shipStreet, setShipStreet] = useState("");
   const [shipNumber, setShipNumber] = useState("");
@@ -60,16 +58,20 @@ export default function CheckoutPage() {
 
   // Pago
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
-
+  useEffect(() => {
+  if (shippingMethod !== "PICKUP" && paymentMethod === "CASH") {
+    setPaymentMethod("TRANSFER"); // o "MERCADO_PAGO"
+  }
+}, [shippingMethod, paymentMethod]);
   const [loading, setLoading] = useState(false);
 
   const vatAmount = useMemo(() => Math.round(subtotalNet * VAT_RATE), [subtotalNet]);
 
   const shipping = useMemo(() => {
     if (shippingMethod === "PICKUP") return 0;
-    if (shippingMethod === "MOTO") return MOTO_PRICES[motoZone] ?? 0;
-    return 0; // OCA/VIACARGO MVP
-  }, [shippingMethod, motoZone]);
+    if (shippingMethod === "MOTO") return motoLocality ? MOTO_PRICES[motoZone] : 0;
+    return 0;
+  }, [shippingMethod, motoZone, motoLocality]);
 
   const baseTotal = subtotalNet + vatAmount + shipping;
 
@@ -90,12 +92,18 @@ export default function CheckoutPage() {
     if (!name.trim() || !email.trim()) return true;
 
     if (needsAddress) {
-      if (!shipPostalCode.trim() || !shipStreet.trim() || !shipNumber.trim()) return true;
+      if (!shipStreet.trim() || !shipNumber.trim()) return true;
+      if (shippingMethod === "MOTO") {
+        const ok = getMotoFromLocality(motoZone, motoLocality);
+        if (!motoLocality.trim() || !ok) return true;
+      }
     }
+
 
     if (invoiceType === "A") {
       if (!invoiceCuit.trim() || !invoiceBusinessName.trim()) return true;
     }
+  
 
     return false;
   }, [
@@ -104,7 +112,7 @@ export default function CheckoutPage() {
     name,
     email,
     needsAddress,
-    shipPostalCode,
+    shippingMethod,
     shipStreet,
     shipNumber,
     invoiceType,
@@ -138,7 +146,9 @@ export default function CheckoutPage() {
         customerName: name.trim(),
         customerEmail: email.trim(),
         customerPhone: phone.trim() || null,
-
+        shipPostalCode: needsAddress ? shipPostalCode.trim() : null,
+        shipLocality: shippingMethod === "MOTO" ? motoLocality : null,
+        motoZone: shippingMethod === "MOTO" ? motoZone : null,
         customText: customText.trim() || null,
         upload: uploaded
           ? { url: uploaded.url, originalName: uploaded.originalName, mimeType: uploaded.mimeType }
@@ -146,9 +156,8 @@ export default function CheckoutPage() {
 
         // envío + pago + factura
         shippingMethod,
-        motoZone: shippingMethod === "MOTO" ? motoZone : null,
+        motoLocality: shippingMethod === "MOTO" ? motoLocality : null,
 
-        shipPostalCode: needsAddress ? shipPostalCode.trim() : null,
         shipStreet: needsAddress ? shipStreet.trim() : null,
         shipNumber: needsAddress ? shipNumber.trim() : null,
         shipApartment: needsAddress ? shipApartment.trim() : null,
@@ -177,7 +186,10 @@ export default function CheckoutPage() {
       }),
     });
 
-    if (!res.ok) throw new Error("Checkout failed");
+    if (!res.ok) {
+  const err = await res.json().catch(() => null);
+  throw new Error(err?.error || "Checkout failed");
+}
     return (await res.json()) as { orderId: string; paymentMethod: PaymentMethod; total: number };
   }
 
@@ -211,6 +223,7 @@ export default function CheckoutPage() {
     }
   }
 
+
   return (
     <main className="p-6 max-w-5xl mx-auto">
       <h1 className="text-2xl font-semibold text-conquer-navy">Checkout</h1>
@@ -230,9 +243,8 @@ export default function CheckoutPage() {
                   key={n}
                   type="button"
                   onClick={() => setStep(n as any)}
-                  className={`h-9 px-3 rounded-2xl border border-conquer-pink ${
-                    step === n ? "bg-conquer-orange text-white border-conquer-orange" : "hover:bg-conquer-pink/10"
-                  }`}
+                  className={`h-9 px-3 rounded-2xl border border-conquer-pink ${step === n ? "bg-conquer-orange text-white border-conquer-orange" : "hover:bg-conquer-pink/10"
+                    }`}
                 >
                   Paso {n}
                 </button>
@@ -376,24 +388,44 @@ export default function CheckoutPage() {
                       </label>
                     ))}
                   </div>
-
+                    {shippingMethod === "PICKUP"}
                   {shippingMethod === "MOTO" && (
-                    <div className="mt-3">
-                      <div className="text-xs text-neutral-600 mb-1">Zona</div>
-                      <select
-                        className="h-11 w-full rounded-2xl border border-conquer-pink px-3"
-                        value={motoZone}
-                        onChange={(e) => setMotoZone(e.target.value as MotoZone)}
-                      >
-                        <option value="CABA">CABA</option>
-                        <option value="GBA1">GBA 1</option>
-                        <option value="GBA2">GBA 2</option>
-                      </select>
-                      <div className="mt-2 text-xs text-neutral-600">
-                        Costo moto: <b>{formatARS(MOTO_PRICES[motoZone])}</b>
+                    <div className="mt-3 grid gap-3">
+                      <div>
+                        <div className="text-xs text-neutral-600 mb-1">Localidad (Moto) *</div>
+
+                        <select
+                          className="h-11 w-full rounded-2xl border border-conquer-pink px-3"
+                          value={`${motoZone}||${motoLocality}`}
+                          onChange={(e) => {
+                            const [z, loc] = e.target.value.split("||");
+                            setMotoZone(z as MotoZone);
+                            setMotoLocality(loc);
+                          }}
+                        >
+                          <option value="CABA||">Seleccioná una localidad…</option>
+
+                          {(["CABA", "GBA1", "GBA2"] as MotoZone[]).map((z) => (
+                            <optgroup key={z} label={z}>
+                              {motoData[z].map((loc) => (
+                                <option key={`${z}-${loc}`} value={`${z}||${loc}`}>
+                                  {loc}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+
+                        {motoLocality && (
+                          <div className="mt-2 text-xs text-neutral-700">
+                            Zona: <b>{motoZone}</b> · Envío: <b>{formatARS(MOTO_PRICES[motoZone])}</b>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
+
+
 
                   {needsAddress && (
                     <div className="mt-4 grid gap-3">
@@ -492,9 +524,17 @@ export default function CheckoutPage() {
 
                   <div className="mt-3 grid gap-2 text-sm">
                     <label className="flex items-center gap-2">
-                      <input type="radio" checked={paymentMethod === "CASH"} onChange={() => setPaymentMethod("CASH")} />
-                      Efectivo (sin recargo)
-                    </label>
+  <input
+    type="radio"
+    checked={paymentMethod === "CASH"}
+    onChange={() => setPaymentMethod("CASH")}
+    disabled={shippingMethod !== "PICKUP"}
+  />
+  <span className={shippingMethod !== "PICKUP" ? "text-neutral-400" : ""}>
+    Efectivo (solo retiro)
+  </span>
+</label>
+
                     <label className="flex items-center gap-2">
                       <input type="radio" checked={paymentMethod === "TRANSFER"} onChange={() => setPaymentMethod("TRANSFER")} />
                       Transferencia (te mostramos los datos y subís comprobante)

@@ -3,6 +3,8 @@ import { getToken } from "next-auth/jwt";
 import { NextRequest } from "next/server";
 import { sendMail } from "@/lib/mailer";
 import { renderOrderCreatedEmail } from "@/lib/email/templates";
+import { getMotoFromLocality, MotoZone } from "@/lib/shipping/moto";
+
 
 export const runtime = "nodejs";
 
@@ -67,23 +69,35 @@ export async function POST(req: NextRequest) {
   // Shipping / Address
   // -------------------------
   const shippingMethod = String(body.shippingMethod ?? "PICKUP"); // PICKUP | MOTO | OCA | VIACARGO
-  const motoZone = body.motoZone ? String(body.motoZone) : null;
+const shipLocality = body.shipLocality ? String(body.shipLocality).trim() : null;
+const shipStreet = body.shipStreet ? String(body.shipStreet).trim() : null;
+const shipNumber = body.shipNumber ? String(body.shipNumber).trim() : null;
+const shipApartment = body.shipApartment ? String(body.shipApartment).trim() : null;
 
-  let shipping = 0;
-  if (shippingMethod === "MOTO") {
-    shipping = MOTO_PRICES[motoZone ?? ""] ?? 0;
-  } else if (shippingMethod === "PICKUP") {
-    shipping = 0;
-  } else {
-    // MVP: OCA / VIACARGO aún sin cálculo
-    shipping = 0;
+let motoZone: MotoZone | null = null;
+let shipping = 0;
+
+if (shippingMethod === "MOTO") {
+  const z = String(body.motoZone ?? "") as MotoZone;
+  const loc = String(body.motoLocality ?? "").trim();
+
+  const info = getMotoFromLocality(z, loc);
+  if (!info) {
+    return Response.json({ error: "Localidad no habilitada para envío en moto" }, { status: 400 });
   }
 
-  const shipPostalCode = body.shipPostalCode ? String(body.shipPostalCode).trim() : null;
-  const shipStreet = body.shipStreet ? String(body.shipStreet).trim() : null;
-  const shipNumber = body.shipNumber ? String(body.shipNumber).trim() : null;
-  const shipApartment = body.shipApartment ? String(body.shipApartment).trim() : null;
+  motoZone = info.zone;
+  shipping = info.price;
 
+  if (!shipStreet || !shipNumber) {
+    return Response.json({ error: "Dirección incompleta" }, { status: 400 });
+  }
+} else if (shippingMethod === "PICKUP") {
+  shipping = 0;
+} else {
+  shipping = 0;
+}
+const shipPostalCode = body.shipPostalCode ? String(body.shipPostalCode).trim() : null;
   // -------------------------
   // Invoice
   // -------------------------
@@ -95,6 +109,9 @@ export async function POST(req: NextRequest) {
   // Payment
   // -------------------------
   const paymentMethod = String(body.paymentMethod ?? "CASH"); // MERCADO_PAGO | CASH | TRANSFER | COORDINATE
+if (paymentMethod === "CASH" && shippingMethod !== "PICKUP") {
+  return Response.json({ error: "Pago en efectivo solo disponible para retiro" }, { status: 400 });
+}
 
   // -------------------------
   // Totales server-side (NETO + IVA + ENVIO + RECARGO)
@@ -124,6 +141,8 @@ export async function POST(req: NextRequest) {
       customerName,
       customerEmail,
       customerPhone,
+      shipLocality,
+      shipPostalCode,
 
       // ✅ nuevos campos
       subtotalNet,
@@ -141,7 +160,6 @@ export async function POST(req: NextRequest) {
 
       shippingMethod: shippingMethod as any,
       motoZone: motoZone ? (motoZone as any) : null,
-      shipPostalCode,
       shipStreet,
       shipNumber,
       shipApartment,

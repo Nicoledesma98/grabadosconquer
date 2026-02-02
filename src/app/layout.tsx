@@ -5,6 +5,7 @@ import Providers from "./providers";
 import { Raleway, Bebas_Neue } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import WhatsappFloat from "@/components/WhatsappFloat";
+import Footer from "@/components/Footer";
 
 const raleway = Raleway({
   subsets: ["latin"],
@@ -32,6 +33,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </Providers>
         <WhatsappFloat />
+        <Footer
+          developerName="Nicolás Agustín Ledesma"
+          developerUrl="https://www.linkedin.com/" // poné tu URL real
+        />
       </body>
     </html>
   );

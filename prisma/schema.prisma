@@ -221,6 +221,7 @@ model Order {
   shipStreet String?
   shipNumber String?
   shipApartment String?
+  shipLocality String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -231,6 +232,10 @@ model Order {
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([customerEmail])
+  @@index([customerPhone])
+  @@index([shipPostalCode])
+  @@index([shipLocality])
 }
 
 model OrderItem {

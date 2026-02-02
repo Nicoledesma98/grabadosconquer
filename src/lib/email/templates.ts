@@ -75,18 +75,18 @@ function prettyMethod(m?: string | null) {
 }
 function prettyPayment(m?: string | null) {
   const x = String(m || "").toUpperCase();
-  if(x === "CASH") return "Efectivo";
-  if(x === "TRANSFER") return "Transferencia";
-  if(x === "MERCADO_PAGO") return "Mercado Pago";
-  if(x === "COORDINATE") return "Coordinar con vendedor";
+  if(x === "CASH") return " Efectivo";
+  if(x === "TRANSFER") return " Transferencia";
+  if(x === "MERCADO_PAGO") return " Mercado Pago";
+  if(x === "COORDINATE") return " Coordinar con vendedor";
   return m || "-";
 }
 function prettyShipping(m?: string | null) {
   const x = String(m || "").toUpperCase();
-  if (x === "PICKUP") return "Retiro";
-  if (x === "MOTO") return "Moto";
-  if (x === "OCA") return "OCA";
-  if (x === "VIACARGO") return "Vía Cargo";
+  if (x === "PICKUP") return " Retiro";
+  if (x === "MOTO") return " Moto";
+  if (x === "OCA") return " OCA";
+  if (x === "VIACARGO") return " Vía Cargo";
   return m || "-";
 }
 
@@ -331,12 +331,12 @@ function methodsBox(o: OrderEmailData) {
   return `
     <div style="margin-top:14px;border:1px solid ${COLORS.border};border-radius:18px;overflow:hidden;">
       <div style="background:${COLORS.pink};padding:10px 12px;font-weight:900;color:${COLORS.navy};">
-        Datos del pedido
+        Datos del envio
       </div>
 
       <div style="padding:12px 12px;border-top:1px solid ${COLORS.border};font-size:13px;color:${COLORS.navy};">
         <div style="display:flex;justify-content:space-between;gap:10px;">
-          <span style="color:${COLORS.gray};">Pago</span>
+          <span style="color:${COLORS.gray};">Pago </span>
           <span style="font-weight:900;">${escapeHtml(pay)}</span>
         </div>
 
@@ -357,7 +357,7 @@ function totalsBox(o: OrderEmailData) {
   return `
   <div style="margin-top:14px;border:1px solid ${COLORS.border};border-radius:18px;padding:12px 14px;">
     <div style="display:flex;justify-content:space-between;color:${COLORS.navy};font-size:13px;">
-      <span>Neto</span><span>${formatARS(o.subtotalNet)}</span>
+      <span>Neto </span><span>${formatARS(o.subtotalNet)}</span>
     </div>
 
     <div style="display:flex;justify-content:space-between;color:${COLORS.navy};font-size:13px;margin-top:6px;">
@@ -365,11 +365,11 @@ function totalsBox(o: OrderEmailData) {
     </div>
 
     <div style="display:flex;justify-content:space-between;color:${COLORS.navy};font-size:13px;margin-top:6px;">
-      <span>Envío</span><span>${formatARS(o.shipping)}</span>
+      <span>Envío </span><span>${formatARS(o.shipping)}</span>
     </div>
 
     <div style="display:flex;justify-content:space-between;color:${COLORS.navy};font-size:13px;margin-top:6px;">
-      <span>Recargo</span><span>${formatARS(o.paymentSurcharge)}</span>
+      <span>Recargo </span><span>${formatARS(o.paymentSurcharge)}</span>
     </div>
 
     <div style="height:1px;background:${COLORS.border};margin:10px 0;"></div>

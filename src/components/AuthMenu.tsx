@@ -69,6 +69,12 @@ const label = displayName;
               >
                 Categorías
               </Link>
+              <Link href="/admin/usuarios"
+                className="block rounded-xl px-3 py-2 text-sm hover:bg-neutral-50"
+                onClick={() =>setOpen(false)}
+                >
+                  Usuarios
+                </Link>
               <Link
                 href="/admin/pedidos"
                 className="block rounded-xl px-3 py-2 text-sm hover:bg-neutral-50"

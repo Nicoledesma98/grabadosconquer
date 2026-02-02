@@ -1,23 +1,22 @@
-import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
-import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
+import NextAuth, { type NextAuthOptions } from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import bcrypt from "bcrypt";
 import { prisma } from "@/lib/prisma";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
-
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
 
   providers: [
-    Google({
+    GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
 
-    Credentials({
+    CredentialsProvider({
       name: "Credenciales",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -40,25 +39,59 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
-        };
+        } as any;
       },
     }),
   ],
+callbacks: {
+  async jwt({ token, user }) {
+    // Si hay user (login), igual lo completamos desde DB por email
+    const email = String((user as any)?.email ?? token.email ?? "").toLowerCase().trim();
+    if (email) {
+      const dbUser = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true, role: true },
+      });
+      if (dbUser) {
+        token.id = dbUser.id;
+        token.role = dbUser.role;
+      }
+    }
 
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = (user as any).id;
-        token.role = (user as any).role;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).id = (token as any).id;
-        (session.user as any).role = (token as any).role;
-      }
-      return session;
-    },
+    // fallback por si vino por credentials
+    if (user) {
+      token.id = (token as any).id ?? (user as any).id;
+      token.role = (token as any).role ?? (user as any).role;
+    }
+
+    return token;
   },
-});
+
+  async session({ session, token }) {
+    if (session.user) {
+      (session.user as any).id = (token as any).id;
+      (session.user as any).role = (token as any).role;
+    }
+    return session;
+  },
+},
+
+// callbacks: {
+//    async jwt({ token, user }) {
+//      if (user) {
+//        token.id = (user as any).id;
+//        token.role = (user as any).role;
+//      }
+//      return token;
+//    },
+//    async session({ session, token }) {
+//      if (session.user) {
+//        (session.user as any).id = (token as any).id;
+//        (session.user as any).role = (token as any).role;
+//      }
+//      return session;
+//    },
+//  },
+};
+
+export default NextAuth(authOptions);
