@@ -1,0 +1,32 @@
+[
+  {
+    "id": 101,
+    "name": "Mate Imperial",
+    "sku": "NF-MATE-IMP",
+    "stock_quantity": 12,
+    "price": "19999",
+    "type": "simple"
+  },
+  {
+    "id": 202,
+    "name": "Termo 1L (Variaciones)",
+    "sku": "NF-TERMO-1L",
+    "type": "variable",
+    "variations": [
+      {
+        "id": 2031,
+        "name": "Negro",
+        "sku": "NF-TERMO-1L-NEG",
+        "stock_quantity": 5,
+        "price": "29999"
+      },
+      {
+        "id": 2032,
+        "name": "Blanco",
+        "sku": "NF-TERMO-1L-BLA",
+        "stock_quantity": 0,
+        "price": "29999"
+      }
+    ]
+  }
+]

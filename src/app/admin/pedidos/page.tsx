@@ -77,12 +77,12 @@ export default async function AdminPedidosPage({
   const where =
     q.length > 0
       ? {
-          OR: [
-            { id: { contains: q, mode: "insensitive" as const } },
-            { customerEmail: { contains: q, mode: "insensitive" as const } },
-            { customerPhone: { contains: q } },
-          ],
-        }
+        OR: [
+          { id: { contains: q, mode: "insensitive" as const } },
+          { customerEmail: { contains: q, mode: "insensitive" as const } },
+          { customerPhone: { contains: q } },
+        ],
+      }
       : {};
 
   const totalCount = await prisma.order.count({ where });
@@ -195,11 +195,10 @@ export default async function AdminPedidosPage({
                 <Link
                   key={p}
                   href={`/admin/pedidos${buildUrl({ q, page: p })}`}
-                  className={`h-9 px-3 rounded-2xl border border-conquer-pink flex items-center ${
-                    p === currentPage
+                  className={`h-9 px-3 rounded-2xl border border-conquer-pink flex items-center ${p === currentPage
                       ? "bg-conquer-orange text-white border-conquer-orange"
                       : "hover:bg-conquer-pink/10"
-                  }`}
+                    }`}
                 >
                   {p}
                 </Link>
@@ -350,6 +349,28 @@ export default async function AdminPedidosPage({
                               {it.qty}× {it.productName}{" "}
                               <span className="text-neutral-500 text-xs">({it.productSlug})</span>
                             </div>
+                            {(it.colorName || it.variantSku) && (
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-neutral-600">
+                                {it.colorName && (
+                                  <>
+                                    <span>
+                                      Color: <b>{it.colorName}</b>
+                                    </span>
+                                    {it.colorHex && (
+                                      <span
+                                        className="h-3 w-3 rounded-full border"
+                                        style={{ backgroundColor: it.colorHex }}
+                                        title={it.colorHex}
+                                      />
+                                    )}
+                                  </>
+                                )}
+                                {it.variantSku && (
+                                  <span className="text-neutral-400">SKU: {it.variantSku}</span>
+                                )}
+                              </div>
+                            )}
+
                             {it.method && (
                               <div className="mt-1 text-xs text-neutral-600">
                                 Personalización: <b>{it.method}</b>

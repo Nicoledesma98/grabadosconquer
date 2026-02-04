@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-
 export const runtime = "nodejs";
 
 const PAGE_SIZE = 24;

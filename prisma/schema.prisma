@@ -27,33 +27,39 @@ enum UploadType {
   PAYMENT_PROOF
   OTHER
 }
+
 enum PersonalizationMethod {
   DTF
   DTG
   FULL_COLOR
   LASER
 }
+
 enum PaymentMethod {
   MERCADO_PAGO
   CASH
   TRANSFER
   COORDINATE
 }
+
 enum InvoiceType {
   A
   B
 }
+
 enum ShippingMethod {
   PICKUP
   MOTO
   OCA
   VIACARGO
 }
+
 enum MotoZone {
   CABA
   GBA1
   GBA2
 }
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -78,15 +84,15 @@ model Product {
   active      Boolean @default(true)
   basePrice   Int?
   weightGrams Int?
-  lenghtMm Int?
-  widthMm Int?
-  heightMm Int?
-  
+  lenghtMm    Int?
+  widthMm     Int?
+  heightMm    Int?
+
   allowedMethods PersonalizationMethod[] @default([])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  variants ProductVariant[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  variants    ProductVariant[]
   images      ProductImage[]
   priceTiers  PriceTier[]
   supplierMap SupplierProduct[]
@@ -94,14 +100,15 @@ model Product {
 
   orderItems OrderItem[] // ✅ agregar esto
 }
+
 model ProductVariant {
   id        String @id @default(cuid())
   productId String
 
-  sku       String @unique
+  sku       String  @unique
   colorName String
   colorHex  String?
-  stock     Int    @default(0)
+  stock     Int     @default(0)
 
   // opcional si algún color tiene precio distinto
   priceOverride Int?
@@ -112,11 +119,12 @@ model ProductVariant {
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   // si querés imágenes por variante (opcional)
-  images ProductImage[]  // lo resolvemos abajo con un campo variantId
+  images ProductImage[] // lo resolvemos abajo con un campo variantId
+
+  supplierMaps SupplierProduct[]
 
   @@index([productId])
 }
-
 
 model Category {
   id   String @id @default(cuid())
@@ -132,19 +140,18 @@ model Category {
 model ProductImage {
   id        String  @id @default(cuid())
   productId String
-  variantId String?   // ✅ nuevo (opcional)
+  variantId String? // ✅ nuevo (opcional)
 
-  url       String
-  alt       String?
-  sort      Int     @default(0)
+  url  String
+  alt  String?
+  sort Int     @default(0)
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([variantId])
 }
-
 
 model PriceTier {
   id        String @id @default(cuid())
@@ -174,23 +181,27 @@ model Supplier {
 model SupplierProduct {
   id         String @id @default(cuid())
   supplierId String
-  productId  String
 
-  externalId  String? // id del proveedor
-  externalSku String? // sku del proveedor
+  // 👇 ahora pueden ser null si todavía no está mapeado
+  productId  String?
+  variantId  String?
 
-  // stock/precio cacheado del proveedor (para no depender en tiempo real siempre)
+  externalId  String?
+  externalSku String?
+  name String?
   supplierStock Int?
   supplierPrice Int?
-
   lastSyncAt DateTime?
 
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product  Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant  ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
-  @@unique([supplierId, productId])
+  @@unique([supplierId, externalSku]) // ✅ clave para upsert
   @@index([supplierId])
   @@index([productId])
+  @@index([variantId])
+  @@index([externalSku])
 }
 
 model Order {
@@ -199,29 +210,29 @@ model Order {
   status OrderStatus @default(PENDING)
 
   subtotalNet Int @default(0)
-  vatRate Int @default(21) //porcentaje
-  vatAmount Int @default(0)
-  shipping Int @default(0)
-  total    Int @default(0)
+  vatRate     Int @default(21) //porcentaje
+  vatAmount   Int @default(0)
+  shipping    Int @default(0)
+  total       Int @default(0)
 
-  paymentMethod PaymentMethod @default(CASH)
-  paymentSurcharge Int @default(0)
+  paymentMethod    PaymentMethod @default(CASH)
+  paymentSurcharge Int           @default(0)
 
-  customerName  String?
-  customerEmail String?
-  customerPhone String?
+  customerName        String?
+  customerEmail       String?
+  customerPhone       String?
   //Factura
-  invoiceType InvoiceType @default(B)
-  invoiceCuit String?
+  invoiceType         InvoiceType    @default(B)
+  invoiceCuit         String?
   invoiceBusinessName String?
   //Envio
-  shippingMethod ShippingMethod @default(PICKUP)
-  motoZone MotoZone?
-  shipPostalCode String?
-  shipStreet String?
-  shipNumber String?
-  shipApartment String?
-  shipLocality String?
+  shippingMethod      ShippingMethod @default(PICKUP)
+  motoZone            MotoZone?
+  shipPostalCode      String?
+  shipStreet          String?
+  shipNumber          String?
+  shipApartment       String?
+  shipLocality        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -243,13 +254,13 @@ model OrderItem {
   orderId   String
   productId String
 
-  variantId   String?  // ✅
-  variantSku  String?  // ✅ snapshot
-  colorName   String?  // ✅ snapshot
-  colorHex    String?  // ✅ snapshot
+  variantId  String? // ✅
+  variantSku String? // ✅ snapshot
+  colorName  String? // ✅ snapshot
+  colorHex   String? // ✅ snapshot
 
   method PersonalizationMethod? // ✅ personalización elegida
-  notes  String?                // opcional
+  notes  String? // opcional
 
   qty       Int
   unitPrice Int

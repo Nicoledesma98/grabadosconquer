@@ -135,7 +135,44 @@ if (paymentMethod === "CASH" && shippingMethod !== "PICKUP") {
   // -------------------------
   // Crear pedido
   // -------------------------
-  const order = await prisma.order.create({
+  // -------------------------
+// Descontar stock + crear pedido (TRANSACTION)
+// -------------------------
+
+// 1) Agrupar cantidades por variante
+const variantQty = new Map<string, number>();
+
+for (const i of items) {
+  const qty = Math.max(1, Number(i.qty || 1));
+  const variantId = i.variantId ? String(i.variantId) : null;
+
+  if (variantId) {
+    variantQty.set(variantId, (variantQty.get(variantId) ?? 0) + qty);
+  }
+}
+
+// 2) Transacción: primero descuento stock (si aplica) y después creo el pedido
+const order = await prisma.$transaction(async (tx) => {
+  // 2.a) Validar y descontar stock de variantes
+  for (const [variantId, qty] of variantQty.entries()) {
+    const upd = await tx.productVariant.updateMany({
+      where: {
+        id: variantId,
+        stock: { gte: qty },
+      },
+      data: {
+        stock: { decrement: qty },
+      },
+    });
+
+    // si no actualizó nada => no había stock suficiente (o id inválido)
+    if (upd.count === 0) {
+      throw new Error(`OUT_OF_STOCK:${variantId}`);
+    }
+  }
+
+  // 2.b) Crear pedido (igual que lo tenías)
+  const created = await tx.order.create({
     data: {
       ...(userId ? { userId: String(userId) } : {}),
       customerName,
@@ -144,7 +181,6 @@ if (paymentMethod === "CASH" && shippingMethod !== "PICKUP") {
       shipLocality,
       shipPostalCode,
 
-      // ✅ nuevos campos
       subtotalNet,
       vatRate,
       vatAmount,
@@ -168,7 +204,7 @@ if (paymentMethod === "CASH" && shippingMethod !== "PICKUP") {
         create: items.map((i: any) => ({
           productId: String(i.productId),
           qty: Math.max(1, Number(i.qty || 1)),
-          unitPrice: Math.max(0, Number(i.unitPrice || 0)), // neto
+          unitPrice: Math.max(0, Number(i.unitPrice || 0)),
           lineTotal:
             Math.max(1, Number(i.qty || 1)) * Math.max(0, Number(i.unitPrice || 0)),
           productName: String(i.productName),
@@ -188,6 +224,12 @@ if (paymentMethod === "CASH" && shippingMethod !== "PICKUP") {
     },
     include: { items: true, uploads: true },
   });
+
+  return created;
+});
+
+// Si llega acá, ya descontó y creó pedido OK ✅
+
 
   // -------------------------
   // Emails
@@ -251,9 +293,19 @@ if (paymentMethod === "CASH" && shippingMethod !== "PICKUP") {
         html: htmlClient,
       });
     }
-  } catch (e) {
-    console.error("MAIL_ERROR", e);
+  } catch (e: any) {
+  const msg = String(e?.message || "");
+
+  if (msg.startsWith("OUT_OF_STOCK:")) {
+    return Response.json(
+      { error: "No hay stock suficiente para uno de los productos." },
+      { status: 409 }
+    );
   }
+
+  console.error("CHECKOUT_ERROR", e);
+  return Response.json({ error: "Checkout error" }, { status: 500 });
+}
 
   return Response.json({
     orderId: order.id,

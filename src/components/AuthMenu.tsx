@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
+import NFSyncButton from "./admin/NFSyncButton";
 
 export default function AuthButton() {
   const { data, status } = useSession();
@@ -35,10 +36,10 @@ export default function AuthButton() {
   }
 
   const displayName =
-  (user?.name && String(user.name).trim()) ||
-  (user?.email ? String(user.email).split("@")[0] : "Mi cuenta");
+    (user?.name && String(user.name).trim()) ||
+    (user?.email ? String(user.email).split("@")[0] : "Mi cuenta");
 
-const label = displayName;
+  const label = displayName;
 
 
   return (
@@ -71,16 +72,23 @@ const label = displayName;
               </Link>
               <Link href="/admin/usuarios"
                 className="block rounded-xl px-3 py-2 text-sm hover:bg-neutral-50"
-                onClick={() =>setOpen(false)}
-                >
-                  Usuarios
-                </Link>
+                onClick={() => setOpen(false)}
+              >
+                Usuarios
+              </Link>
               <Link
                 href="/admin/pedidos"
                 className="block rounded-xl px-3 py-2 text-sm hover:bg-neutral-50"
                 onClick={() => setOpen(false)}
               >
                 Pedidos
+              </Link>
+              <Link
+                href="/admin/proveedores"
+                className="block rounded-xl px-3 py-2 text-sm hover:bg-neutral-50"
+                onClick={() => setOpen(false)}
+              >
+                Proveedores
               </Link>
             </>
           ) : (
