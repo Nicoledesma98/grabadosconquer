@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import NFSyncButton from "./NFSyncButton";
 
 type Variant = {
   id: string;
@@ -115,7 +114,6 @@ export default function ProductVariantsPanel({ productId }: { productId: string 
       >
         Crear variante
       </button>
-      <NFSyncButton/>
 
       <div className="mt-6">
         {loading ? (

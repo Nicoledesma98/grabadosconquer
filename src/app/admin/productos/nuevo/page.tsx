@@ -116,17 +116,6 @@ export default function AdminNuevoProductoPage() {
             inputMode="numeric"
           />
         </div>
-
-        <div className="grid gap-2">
-          <label className="text-sm text-neutral-700">Imagen (URL) (opcional)</label>
-          <input
-            className="h-11 rounded-2xl border px-4"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://..."
-          />
-        </div>
-
         <div className="grid gap-2">
           <label className="text-sm text-neutral-700">Categorías</label>
           <div className="flex flex-wrap gap-2">

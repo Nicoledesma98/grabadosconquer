@@ -88,6 +88,8 @@ model Product {
   widthMm     Int?
   heightMm    Int?
 
+  minQtyStep Int @default(1)
+  
   allowedMethods PersonalizationMethod[] @default([])
 
   createdAt   DateTime          @default(now())

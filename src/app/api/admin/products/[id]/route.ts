@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
-
+function normalizeMin
 function toSlug(input: string) {
   return input
     .toLowerCase()

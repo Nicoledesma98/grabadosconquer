@@ -378,6 +378,80 @@ export default async function AdminPedidosPage({
                               </div>
                             )}
                           </div>
+                                   {(() => {
+                    const personalizationUploads = o.uploads.filter((u) =>
+                      ["TEXT", "IMAGE", "PDF", "DOC"].includes(u.type)
+                    );
+
+                    const paymentProofUploads = o.uploads.filter((u) =>
+                      u.type === "PAYMENT_PROOF"
+                      // Si todavía NO agregaste PAYMENT_PROOF al enum, usá esto:
+                      // u.type === "OTHER" && (u.originalName || "").toLowerCase().includes("comprobante")
+                    );
+
+                    return (
+                      <>
+                        {/* PERSONALIZACIÓN */}
+                        {personalizationUploads.length > 0 && (
+                          <div className="mt-4 rounded-3xl border border-conquer-pink bg-conquer-pink/10 p-4 text-sm">
+                            <div className="font-semibold text-conquer-navy mb-2">Personalización</div>
+
+                            <div className="grid gap-2">
+                              {personalizationUploads.map((u) => (
+                                <div key={u.id} className="text-neutral-800">
+                                  <b>{u.type}</b>:{" "}
+                                  {u.text ? (
+                                    <span>{u.text}</span>
+                                  ) : u.url ? (
+                                    <a
+                                      href={u.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="underline"
+                                    >
+                                      {u.originalName || "Abrir archivo"}
+                                    </a>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* COMPROBANTE */}
+                        {paymentProofUploads.length > 0 && (
+                          <div className="mt-3 rounded-3xl border border-conquer-pink bg-white p-4 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex rounded-full bg-conquer-orange text-white text-xs font-semibold px-3 py-1">
+                                Comprobante de pago
+                              </span>
+                            </div>
+
+                            <div className="mt-2 grid gap-2">
+                              {paymentProofUploads.map((u) => (
+                                <div key={u.id} className="text-neutral-800">
+                                  {u.url ? (
+                                    <a
+                                      href={u.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="underline"
+                                    >
+                                      {u.originalName || "Abrir comprobante"}
+                                    </a>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
 
                           <div className="shrink-0 font-semibold text-conquer-navy">
                             {formatARS(it.lineTotal)}

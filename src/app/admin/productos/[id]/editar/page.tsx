@@ -395,33 +395,6 @@ export default function AdminEditarProductoPage() {
                             >
                                 {uploading ? "Subiendo..." : "Subir y guardar"}
                             </button>
-
-                            <div className="mt-6 border-t pt-4">
-                                <div className="text-sm font-medium">Agregar imagen por URL</div>
-
-                                <div className="mt-3 grid gap-3">
-                                    <input
-                                        className="h-11 rounded-2xl border px-4"
-                                        placeholder="URL imagen (https://...)"
-                                        value={newImgUrl}
-                                        onChange={(e) => setNewImgUrl(e.target.value)}
-                                    />
-                                    <input
-                                        className="h-11 rounded-2xl border px-4"
-                                        placeholder="Alt (opcional)"
-                                        value={newImgAlt}
-                                        onChange={(e) => setNewImgAlt(e.target.value)}
-                                    />
-
-                                    <button
-                                        type="button"
-                                        onClick={addImage}
-                                        className="h-11 w-full rounded-2xl bg-black text-white hover:opacity-90"
-                                    >
-                                        Agregar imagen
-                                    </button>
-                                </div>
-                            </div>
                         </div>
 
 

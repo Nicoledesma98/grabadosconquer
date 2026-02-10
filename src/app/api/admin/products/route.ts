@@ -9,6 +9,10 @@ function toSlug(input: string) {
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "");
 }
+function normalizeMinQtyStep(v: any) {
+  const n = Number(v);
+  return [1, 5, 10].includes(n) ? n : 1;
+}
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -16,7 +20,7 @@ export async function POST(req: Request) {
   const name = String(body.name ?? "").trim();
   const slugRaw = String(body.slug ?? "").trim();
   const description = body.description ? String(body.description).trim() : null;
-
+  const minQtyStep = normalizeMinQtyStep(body.minQtyStep);
   const basePrice =
     body.basePrice === "" || body.basePrice == null
       ? null
@@ -54,6 +58,7 @@ export async function POST(req: Request) {
       description,
       basePrice: basePrice == null ? null : Math.round(basePrice),
       active,
+      minQtyStep,
       images: imageUrl
         ? { create: [{ url: imageUrl, alt: name, sort: 0 }] }
         : undefined,
