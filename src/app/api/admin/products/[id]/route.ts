@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
-function normalizeMin
+
+function normalizeMinQtyStep(v: any) {
+  const n = Number(v);
+  return [1,5,10].includes(n) ? n:1;
+}
+
 function toSlug(input: string) {
   return input
     .toLowerCase()
@@ -55,9 +60,30 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const basePrice =
     body.basePrice === "" || body.basePrice == null ? null : Number(body.basePrice);
+   let stock: number | null = null;
+  if (body.stock !== undefined && body.stock !== "") {
+    const parsed = Number(body.stock);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      return Response.json({ error: "El stock debe ser un número entero ≥ 0" }, { status: 400 });
+    }
+    stock = parsed;
+  } else if (body.stock === "") {
+    stock = null; // vacío = sin stock / no gestionado
+  }
 
+  // Validación: si el producto tiene variantes, el stock debe ser null
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: { variants: { select: { id: true } } },
+  });
+  if (!product) return Response.json({ error: "Not found" }, { status: 404 });
+
+  const hasVariants = product.variants.length > 0;
+  if (hasVariants && stock !== null) {
+    return Response.json({ error: "Los productos con variantes deben gestionar el stock por variante" }, { status: 400 });
+  }
   const active = body.active !== false;
-
+  const minQtyStep = normalizeMinQtyStep(body.minQtyStep);
   const imageUrl = body.imageUrl ? String(body.imageUrl).trim() : "";
   const categoryIds: string[] = Array.isArray(body.categoryIds) ? body.categoryIds : [];
 
@@ -94,10 +120,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     data: {
       name,
       slug,
+      minQtyStep,
       description,
       basePrice: basePrice == null ? null : Math.round(basePrice),
       active,
-
+      stock: hasVariants ? null : stock,
       // ✅ NUEVO: guardamos métodos permitidos
       allowedMethods,
 
@@ -119,7 +146,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           }
         : {}),
     },
-    select: { id: true, allowedMethods: true }, // ✅ devolvemos para confirmar
+    select: { id: true, allowedMethods: true, stock: true }, // ✅ devolvemos para confirmar
   });
 
   return Response.json(updated);

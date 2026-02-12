@@ -1,46 +1,161 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 
 const SLIDES = [
-  { src: "/slides/slide1boligrafo.jpg", alt: "Slide 1" },
-  { src: "/slides/slide2botellas.jpg", alt: "Slide 2" },
-  { src: "/slides/slide3termos.jpg", alt: "Slide 3" },
+  {
+    src: "/slides/slide1boligrafo.jpg",
+    alt: "BOLÍGRAFOS PERSONALIZADOS - Grabados Conquer",
+    title: "Bolígrafos personalizados",
+    subtitle: "Ideal para empresas y eventos",
+  },
+  {
+    src: "/slides/slide2botellas.jpg",
+    alt: "BOTELLAS Y VASOS - Grabados Conquer",
+    title: "Botellas y vasos",
+    subtitle: "Grabado de alta calidad",
+  },
+  {
+    src: "/slides/slide3termos.jpg",
+    alt: "TERMOS Y MATES - Grabados Conquer",
+    title: "Termos y mates",
+    subtitle: "El regalo perfecto",
+  },
 ];
 
 export default function HomeSlider() {
-  const [i, setI] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [isHovering, setIsHovering] = useState(false);
 
-  useEffect(() => {
-    const t = setInterval(() => setI((v) => (v + 1) % SLIDES.length), 4500);
-    return () => clearInterval(t);
+  const nextSlide = useCallback(() => {
+    setCurrentIndex((prev) => (prev + 1) % SLIDES.length);
   }, []);
 
+  const prevSlide = useCallback(() => {
+    setCurrentIndex((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
+  }, []);
+
+  const goToSlide = (index: number) => {
+    setCurrentIndex(index);
+  };
+
+  // Autoplay
+  useEffect(() => {
+    if (!isAutoPlaying || isHovering) return;
+    const interval = setInterval(nextSlide, 3000);
+    return () => clearInterval(interval);
+  }, [isAutoPlaying, isHovering, nextSlide]);
+
   return (
-    <div className="relative overflow-hidden border border-conquer-pink bg-white">
-      <div className="relative aspect-[16/6] w-full">
-        <Image
-          src={SLIDES[i].src}
-          alt={SLIDES[i].alt}
-          fill
-          className="object-cover"
-          priority
-        />
+    <div
+      className="group relative overflow-hidden bg-gradient-to-br from-conquer-navy/5 to-conquer-pink/5"
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
+      {/* Slides container */}
+      <div className="relative aspect-[21/9] w-full md:aspect-[21/8] lg:aspect-[21/7]">
+        {SLIDES.map((slide, idx) => (
+          <div
+            key={slide.src}
+            className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+              idx === currentIndex ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <Image
+              src={slide.src}
+              alt={slide.alt}
+              fill
+              className="object-cover"
+              priority={idx === 0}
+              sizes="100vw"
+            />
+
+            {/* Overlay degradado para mejorar legibilidad del texto */}
+            <div className="absolute inset-0 bg-gradient-to-r from-conquer-navy/70 via-transparent to-transparent" />
+
+            {/* Contenido textual */}
+            <div className="absolute inset-0 flex items-center">
+              <div className="mx-auto w-full max-w-6xl px-4 md:px-6">
+                <div className="max-w-lg transform transition-all duration-700 delay-200">
+                  <span className="inline-block rounded-full bg-conquer-orange/90 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white backdrop-blur-sm">
+                    {slide.subtitle}
+                  </span>
+                  <h2 className="mt-4 text-3xl font-bold text-white drop-shadow-lg md:text-4xl lg:text-5xl">
+                    {slide.title}
+                  </h2>
+                  <div className="mt-6 flex gap-4">
+                    <a
+                      href="/productos"
+                      className="rounded-full bg-conquer-orange px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:scale-105 hover:bg-conquer-orange/90 hover:shadow-xl"
+                    >
+                      Ver productos
+                    </a>
+                    <a
+                      href="https://wa.me/541131002011"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-full bg-white/20 px-6 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/30"
+                    >
+                      Consultar
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="absolute inset-x-0 bottom-3 flex justify-center gap-2">
-        {SLIDES.map((_, idx) => (
-          <button
-            key={idx}
-            onClick={() => setI(idx)}
-            className={`h-2.5 w-2.5 rounded-full ${
-              idx === i ? "bg-conquer-orange" : "bg-white/70"
-            }`}
-            aria-label={`Ir a slide ${idx + 1}`}
-            type="button"
-          />
-        ))}
+      {/* Botones de navegación - aparecen al hover del contenedor */}
+      <button
+        onClick={prevSlide}
+        className="absolute left-4 top-1/2 hidden -translate-y-1/2 rounded-full bg-white/80 p-2 text-conquer-navy backdrop-blur-sm transition-all hover:scale-110 hover:bg-conquer-orange hover:text-white group-hover:block md:block"
+        aria-label="Slide anterior"
+      >
+        <ChevronLeft className="h-6 w-6" />
+      </button>
+
+      <button
+        onClick={nextSlide}
+        className="absolute right-4 top-1/2 hidden -translate-y-1/2 rounded-full bg-white/80 p-2 text-conquer-navy backdrop-blur-sm transition-all hover:scale-110 hover:bg-conquer-orange hover:text-white group-hover:block md:block"
+        aria-label="Slide siguiente"
+      >
+        <ChevronRight className="h-6 w-6" />
+      </button>
+
+      {/* Controles inferiores */}
+      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-white/20 px-4 py-2 backdrop-blur-sm">
+        {/* Dots */}
+        <div className="flex gap-2">
+          {SLIDES.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => goToSlide(idx)}
+              className={`h-2.5 rounded-full transition-all ${
+                idx === currentIndex
+                  ? "w-6 bg-conquer-orange"
+                  : "w-2.5 bg-white/70 hover:bg-white"
+              }`}
+              aria-label={`Ir al slide ${idx + 1}`}
+            />
+          ))}
+        </div>
+
+        {/* Botón pausa/play */}
+        <button
+          onClick={() => setIsAutoPlaying(!isAutoPlaying)}
+          className="ml-2 rounded-full bg-white/30 p-1.5 text-white backdrop-blur-sm transition-all hover:bg-white/50"
+          aria-label={isAutoPlaying ? "Pausar" : "Iniciar"}
+        >
+          {isAutoPlaying ? (
+            <Pause className="h-3.5 w-3.5" />
+          ) : (
+            <Play className="h-3.5 w-3.5" />
+          )}
+        </button>
       </div>
     </div>
   );

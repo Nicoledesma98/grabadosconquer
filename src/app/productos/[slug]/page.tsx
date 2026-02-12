@@ -33,6 +33,7 @@ export default async function ProductoDetallePage({
           name: product.name,
           description: product.description,
           basePrice: product.basePrice,
+          minQtyStep: product.minQtyStep ?? 1,
           images: product.images.map((i) => ({ url: i.url, alt: i.alt })),
           priceTiers: product.priceTiers.map((t) => ({
             minQty: t.minQty,

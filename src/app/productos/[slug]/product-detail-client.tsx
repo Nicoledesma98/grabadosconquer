@@ -1,10 +1,30 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCart } from "@/store/cart";
 import { unitPriceForQty, type PriceTier } from "@/lib/pricing";
-import PersonalizationMethod from "@prisma/client";
+import {
+  Tag,
+  Folder,
+  SwatchBook,
+  Circle,
+  Brush,
+  Sparkles,
+  Package,
+  Minus,
+  Plus,
+  ShoppingCart,
+  CheckCircle,
+  LoaderCircle,
+  Truck,
+  Home,
+  Bike,
+  Shield,
+  Clock,
+  CreditCard,
+  MessageCircle
+} from "lucide-react";
 
 type VariantDTO = {
   id: string;
@@ -14,6 +34,7 @@ type VariantDTO = {
   stock: number;
   priceOverride?: number | null;
 };
+
 type PersonalizationMethod = "DTF" | "DTG" | "FULL_COLOR" | "LASER";
 type ProductDTO = {
   id: string;
@@ -26,8 +47,8 @@ type ProductDTO = {
   categories?: { id: string; name: string; slug: string }[];
   variants?: VariantDTO[];
   allowedMethods?: PersonalizationMethod[];
+  minQtyStep?: number | null;
 };
-
 
 function formatARS(value: number) {
   return new Intl.NumberFormat("es-AR", {
@@ -38,12 +59,13 @@ function formatARS(value: number) {
 }
 
 export default function ProductDetailClient({ product }: { product: ProductDTO }) {
-  const [qty, setQty] = useState(1);
+  const step = Math.max(1, Number(product.minQtyStep ?? 1));
+  const [qty, setQty] = useState(step);
   const [addedMsg, setAddedMsg] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const addItem = useCart((s) => s.addItem);
   const allowed = product.allowedMethods ?? [];
-  const [method, setMethod] = useState<PersonalizationMethod | null>(allowed[0] ?? null)
+  const [method, setMethod] = useState<PersonalizationMethod | null>(allowed[0] ?? null);
   const variants = product.variants ?? [];
   const [variantId, setVariantId] = useState<string>(variants[0]?.id ?? "");
   const imgs = product.images?.length ? product.images : [];
@@ -61,13 +83,19 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
     [product.priceTiers, baseForPricing, qty]
   );
 
+  useEffect(() => {
+    setQty((q) => {
+      const n = Number.isFinite(q) ? q : step;
+      return Math.max(step, Math.round(n / step) * step);
+    });
+  }, [step]);
+
   const total = unitPrice * qty;
 
   const nextTier = useMemo(() => {
     const tiers = [...(product.priceTiers ?? [])].sort((a, b) => a.minQty - b.minQty);
     return tiers.find((t) => t.minQty > qty) ?? null;
   }, [product.priceTiers, qty]);
-
 
   const currentTier = useMemo(() => {
     const tiers = [...(product.priceTiers ?? [])].sort((a, b) => a.minQty - b.minQty);
@@ -76,235 +104,312 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
     return cur;
   }, [product.priceTiers, qty]);
 
+  const handleAddToCart = () => {
+    addItem(
+      {
+        productId: product.id,
+        slug: product.slug,
+        name: product.name,
+        imageUrl: activeImg ?? null,
+        unitPrice,
+        method,
+        minQtyStep: step,
+        variantId: selectedVariant?.id ?? null,
+        variantSku: selectedVariant?.sku ?? null,
+        variantName: selectedVariant?.colorName ?? null,
+      } as any,
+      qty
+    );
+    setAddedMsg(true);
+    setTimeout(() => setAddedMsg(false), 1500);
+  };
+
+  const stockStatus =
+    stock === null ? null : stock > 0 ? (
+      <span className="flex items-center gap-1 text-green-600">
+        <CheckCircle className="w-4 h-4" /> Stock disponible
+      </span>
+    ) : (
+      <span className="flex items-center gap-1 text-red-600">
+        <Package className="w-4 h-4" /> Sin stock
+      </span>
+    );
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="grid gap-8 lg:grid-cols-2">
-        {/* Galería */}
-        <section className="grid gap-3">
-          <div className="rounded-3xl border border-conquer-pink overflow-hidden bg-white">
-            <div className="relative aspect-square bg-conquer-pink/10">
-              {activeImg ? (
-                <Image
-                  src={activeImg}
-                  alt={product.name}
-                  fill
-                  className="object-contain p-6"
-                  priority
-                />
-              ) : (
-                <div className="h-full grid place-items-center text-sm text-neutral-500">
-                  Sin imagen
-                </div>
-              )}
-            </div>
+        {/* ========== COLUMNA IZQUIERDA - GALERÍA ========== */}
+        <section className="space-y-4">
+          {/* Imagen principal */}
+          <div className="group relative aspect-square overflow-hidden rounded-3xl border-2 border-conquer-pink bg-gradient-to-br from-white to-conquer-pink/10 shadow-md transition-shadow hover:shadow-lg">
+            <div className="absolute inset-0 bg-conquer-pink/5 opacity-0 transition-opacity group-hover:opacity-100" />
+            {activeImg ? (
+              <Image
+                src={activeImg}
+                alt={product.name}
+                fill
+                className="object-contain p-6 transition-transform duration-300 group-hover:scale-105"
+                priority
+              />
+            ) : (
+              <div className="grid h-full place-items-center text-neutral-400">
+                <Package className="h-16 w-16" />
+                <span className="mt-2 text-sm">Sin imagen</span>
+              </div>
+            )}
           </div>
 
+          {/* Miniaturas */}
           {imgs.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {imgs.map((im, idx) => {
-                const on = idx === activeIdx;
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {imgs.map((img, idx) => {
+                const isActive = idx === activeIdx;
                 return (
                   <button
-                    key={`${im.url}-${idx}`}
-                    type="button"
+                    key={`${img.url}-${idx}`}
                     onClick={() => setActiveIdx(idx)}
-                    className={`relative h-20 w-20 shrink-0 rounded-2xl border overflow-hidden bg-white ${on ? "border-conquer-orange" : "border-conquer-pink hover:border-conquer-turq"
-                      }`}
-                    aria-label={`Ver imagen ${idx + 1}`}
+                    className={`relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
+                      isActive
+                        ? "border-conquer-orange shadow-md"
+                        : "border-conquer-pink/30 hover:border-conquer-turq hover:shadow-sm"
+                    }`}
                   >
-                    <Image src={im.url} alt={im.alt ?? product.name} fill className="object-contain p-2" />
+                    <Image
+                      src={img.url}
+                      alt={img.alt ?? `Vista ${idx + 1}`}
+                      fill
+                      className="object-contain p-2"
+                    />
                   </button>
                 );
               })}
-
             </div>
           )}
         </section>
 
-        {/* Info + compra */}
-        <section className="grid gap-4">
-          {/* Badges categorías */}
+        {/* ========== COLUMNA DERECHA - INFORMACIÓN ========== */}
+        <section className="space-y-5">
+          {/* Categorías */}
           {!!product.categories?.length && (
-            <div className="flex flex-wrap gap-2">
-              {product.categories.map((c) => (
+            <div className="flex flex-wrap items-center gap-2">
+              <Folder className="h-5 w-5 text-conquer-navy" />
+              {product.categories.map((cat) => (
                 <span
-                  key={c.id}
-                  className="inline-flex items-center rounded-full bg-conquer-pink/40 px-3 py-1 text-xs font-medium text-conquer-navy"
+                  key={cat.id}
+                  className="inline-flex items-center rounded-full bg-conquer-pink/20 px-4 py-1.5 text-xs font-medium text-conquer-navy ring-1 ring-conquer-pink/30"
                 >
-                  {c.name}
+                  <Tag className="mr-1.5 h-3.5 w-3.5" />
+                  {cat.name}
                 </span>
               ))}
             </div>
           )}
 
-          <div>
-            <h1 className="text-3xl font-semibold text-conquer-navy">{product.name}</h1>
-            <div className="mt-1 text-xs text-neutral-500">SKU/Slug: {product.slug}</div>
-
+          {/* Título y descripción */}
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold text-conquer-navy lg:text-4xl">{product.name}</h1>
+            <p className="text-xs text-neutral-500">SKU: {product.slug}</p>
             {product.description ? (
-              <p className="mt-3 text-neutral-700 leading-relaxed">{product.description}</p>
+              <p className="mt-2 text-base leading-relaxed text-neutral-700">
+                {product.description}
+              </p>
             ) : (
-              <p className="mt-3 text-sm text-neutral-500">Sin descripción</p>
+              <p className="mt-2 text-sm italic text-neutral-400">
+                Sin descripción disponible
+              </p>
             )}
           </div>
-          {/* Variantes (color/sku/stock) */}
-          {variants.length > 0 && (
-            <div className="rounded-3xl border border-conquer-pink bg-white p-4">
-              <div className="text-sm font-semibold text-conquer-navy">Color</div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
+          {/* Variantes (colores) */}
+          {variants.length > 0 && (
+            <div className="rounded-3xl border border-conquer-pink bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+              <div className="flex items-center gap-2 border-b border-conquer-pink/20 pb-3">
+                <SwatchBook className="h-5 w-5 text-conquer-navy" />
+                <h3 className="font-semibold text-conquer-navy">Colores disponibles</h3>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
                 {variants.map((v) => {
-                  const on = v.id === (selectedVariant?.id ?? "");
+                  const isSelected = v.id === selectedVariant?.id;
                   return (
                     <button
                       key={v.id}
-                      type="button"
                       onClick={() => setVariantId(v.id)}
-                      className={`flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm ${on
-                        ? "border-conquer-orange bg-conquer-pink/20"
-                        : "border-conquer-pink hover:border-conquer-turq"
-                        }`}
-                      title={v.sku}
+                      className={`flex items-center gap-2 rounded-full border-2 px-4 py-2 transition-all ${
+                        isSelected
+                          ? "border-conquer-orange bg-conquer-pink/20 shadow-sm"
+                          : "border-conquer-pink/30 hover:border-conquer-turq hover:bg-conquer-pink/10"
+                      }`}
                     >
-                      <span
-                        className="h-4 w-4 rounded-full border"
-                        style={{ backgroundColor: v.colorHex ?? "#fff" }}
+                      <Circle
+                        className="h-5 w-5"
+                        style={{ fill: v.colorHex ?? "#fff", color: v.colorHex ?? "#fff" }}
                       />
-                      <span className="font-medium text-conquer-navy">{v.colorName}</span>
+                      <span className="text-sm font-medium text-conquer-navy">
+                        {v.colorName}
+                      </span>
                     </button>
                   );
                 })}
               </div>
-
-              <div className="mt-3 text-xs text-neutral-600">
-                SKU: <b>{selectedVariant?.sku ?? "-"}</b>
-                {typeof stock === "number" && (
-                  <>
-                    {" "}— Stock:{" "}
-                    <b className={stock > 0 ? "text-green-700" : "text-red-700"}>
-                      {stock > 0 ? stock : "Sin stock"}
-                    </b>
-                  </>
-                )}
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+                <div className="flex items-center gap-1 text-neutral-600">
+                  <Package className="h-4 w-4" />
+                  SKU: <span className="font-mono">{selectedVariant?.sku ?? "-"}</span>
+                </div>
+                {stockStatus}
               </div>
-
               {selectedVariant?.priceOverride != null && (
-                <div className="mt-2 text-xs text-neutral-600">
-                  Precio base de esta variante: <b>{formatARS(selectedVariant.priceOverride)}</b>
+                <div className="mt-3 rounded-xl bg-conquer-pink/10 p-2 text-xs text-conquer-navy">
+                  Precio especial de esta variante:{" "}
+                  <span className="font-bold">{formatARS(selectedVariant.priceOverride)}</span> c/u
                 </div>
               )}
             </div>
           )}
+
+          {/* Personalización */}
           {allowed.length > 0 && (
-            <div className="rounded-3xl border border-conquer-pink bg-white p-4">
-              <div className="text-sm font-semibold text-conquer-navy">Personalización</div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
+            <div className="rounded-3xl border border-conquer-pink bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+              <div className="flex items-center gap-2 border-b border-conquer-pink/20 pb-3">
+                <Brush className="h-5 w-5 text-conquer-navy" />
+                <h3 className="font-semibold text-conquer-navy">Personalización</h3>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
                 {allowed.map((m) => {
-                  const on = m === method;
-                  const label =
-                    m === "FULL_COLOR" ? "Full color" :
-                      m === "LASER" ? "Láser" :
-                        m === "DTF" ? "DTF" : "DTG";
-
+                  const isSelected = m === method;
+                  const labels = {
+                    DTF: "DTF",
+                    DTG: "DTG",
+                    FULL_COLOR: "Full color",
+                    LASER: "Láser",
+                  };
                   return (
                     <button
                       key={m}
-                      type="button"
                       onClick={() => setMethod(m)}
-                      className={`rounded-2xl border px-3 py-2 text-sm font-medium ${on
-                          ? "border-conquer-orange bg-conquer-pink/20 text-conquer-navy"
-                          : "border-conquer-pink hover:border-conquer-turq text-neutral-700"
-                        }`}
+                      className={`flex items-center gap-1.5 rounded-full border-2 px-4 py-2 text-sm font-medium transition-all ${
+                        isSelected
+                          ? "border-conquer-orange bg-conquer-pink/20 text-conquer-navy shadow-sm"
+                          : "border-conquer-pink/30 hover:border-conquer-turq hover:bg-conquer-pink/10"
+                      }`}
                     >
-                      {label}
+                      <Sparkles className="h-4 w-4" />
+                      {labels[m] || m}
                     </button>
                   );
                 })}
               </div>
-
-              <div className="mt-2 text-xs text-neutral-600">
-                Elegí el método de personalización para este producto.
-              </div>
+              <p className="mt-3 text-xs text-neutral-500">
+                Seleccioná el método de personalización para este producto.
+              </p>
             </div>
           )}
 
-
-          {/* Caja de precio */}
-          <div className="rounded-3xl border border-conquer-pink bg-white p-5">
-            <div className="flex items-end justify-between gap-4">
+          {/* Caja de precios y cantidad */}
+          <div className="rounded-3xl border-2 border-conquer-pink bg-gradient-to-br from-white to-conquer-pink/5 p-6 shadow-lg">
+            {/* Precios */}
+            <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="text-sm text-neutral-500">Precio unitario</div>
-                <div className="text-3xl font-semibold text-conquer-navy">{formatARS(unitPrice)}</div>
-                {currentTier && (
-                  <div className="mt-1 text-xs text-neutral-500">
-                    Aplicado: desde <b>{currentTier.minQty}u</b>
-                  </div>
-                )}
+                <span className="text-sm font-medium text-neutral-500">Precio unitario</span>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-conquer-navy">
+                    {formatARS(unitPrice)}
+                  </span>
+                  {currentTier && (
+                    <span className="rounded-full bg-conquer-turq/20 px-2 py-1 text-xs font-medium text-conquer-navy">
+                      {currentTier.minQty}+
+                    </span>
+                  )}
+                </div>
               </div>
-
               <div className="text-right">
-                <div className="text-sm text-neutral-500">Total</div>
-                <div className="text-3xl font-semibold text-conquer-navy">{formatARS(total)}</div>
+                <span className="text-sm font-medium text-neutral-500">Total</span>
+                <div className="mt-1 text-2xl font-bold text-conquer-orange lg:text-3xl">
+                  {formatARS(total)}
+                </div>
               </div>
             </div>
 
             {/* Cantidad */}
-            <div className="mt-5 flex items-center gap-3">
-              <div className="text-sm text-neutral-600">Cantidad</div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="h-10 w-10 rounded-xl border border-conquer-pink hover:bg-conquer-pink/20"
-                  onClick={() => setQty((q) => Math.max(1, q - 1))}
-                >
-                  -
-                </button>
-
-                <input
-                  className="h-10 w-24 rounded-xl border border-conquer-pink text-center"
-                  value={qty}
-                  onChange={(e) => setQty(Math.max(1, Number(e.target.value || 1)))}
-                  inputMode="numeric"
-                />
-
-                <button
-                  type="button"
-                  className="h-10 w-10 rounded-xl border border-conquer-pink hover:bg-conquer-pink/20"
-                  onClick={() => setQty((q) => q + 1)}
-                >
-                  +
-                </button>
+            <div className="mt-6 flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1 text-sm font-medium text-neutral-600">
+                  <Package className="h-4 w-4" />
+                  Cantidad
+                </span>
+                <div className="flex items-center overflow-hidden rounded-xl border-2 border-conquer-pink/50 bg-white">
+                  <button
+                    onClick={() => setQty((q) => Math.max(step, q - step))}
+                    className="flex h-10 w-10 items-center justify-center transition-colors hover:bg-conquer-pink/20 disabled:opacity-50"
+                    disabled={qty <= step}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <input
+                    className="h-10 w-20 border-x-2 border-conquer-pink/30 text-center font-medium outline-none"
+                    value={qty}
+                    min={step}
+                    step={step}
+                    onChange={(e) => {
+                      const raw = Number(e.target.value || step);
+                      const safe = Number.isFinite(raw) ? raw : step;
+                      const rounded = Math.max(step, Math.round(safe / step) * step);
+                      setQty(rounded);
+                    }}
+                  />
+                  <button
+                    onClick={() => setQty((q) => q + step)}
+                    className="flex h-10 w-10 items-center justify-center transition-colors hover:bg-conquer-pink/20"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
+              {step > 1 && (
+                <div className="flex items-center gap-1 rounded-full bg-conquer-pink/20 px-3 py-1.5 text-xs text-conquer-navy">
+                  <Package className="h-3.5 w-3.5" />
+                  Múltiplos de <span className="font-bold">{step}</span>
+                </div>
+              )}
             </div>
 
-            {/* Progreso al siguiente tier */}
+            {/* Próximo descuento */}
             {nextTier && (
-              <div className="mt-4 rounded-2xl bg-conquer-pink/25 p-3 text-sm text-conquer-navy">
-                Te faltan <b>{nextTier.minQty - qty}u</b> para pagar{" "}
-                <b>{formatARS(nextTier.price)}</b> c/u.
+              <div className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+                <span className="font-medium">¡Ahorrá más!</span> Te faltan{" "}
+                <span className="font-bold">{nextTier.minQty - qty} unidades</span> para pagar{" "}
+                <span className="font-bold">{formatARS(nextTier.price)}</span> c/u.
               </div>
             )}
 
-            {/* Tabla tiers */}
+            {/* Tabla de precios por volumen */}
             {(product.priceTiers?.length ?? 0) > 0 && (
               <div className="mt-5">
-                <div className="text-sm font-semibold text-conquer-navy">Precios por cantidad</div>
-                <div className="mt-2 grid gap-2">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-conquer-navy">
+                  <Tag className="h-4 w-4" />
+                  Precios por volumen
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {[...(product.priceTiers ?? [])]
                     .sort((a, b) => a.minQty - b.minQty)
-                    .map((t) => {
-                      const on = qty >= t.minQty;
+                    .map((tier) => {
+                      const isActive = qty >= tier.minQty;
                       return (
                         <div
-                          key={t.minQty}
-                          className={`flex items-center justify-between rounded-2xl px-3 py-2 text-sm border ${on
-                            ? "border-conquer-turq bg-conquer-turq/10"
-                            : "border-conquer-pink bg-white"
-                            }`}
+                          key={tier.minQty}
+                          className={`rounded-xl border-2 p-2 text-center transition-all ${
+                            isActive
+                              ? "border-conquer-turq bg-conquer-turq/10 shadow-sm"
+                              : "border-conquer-pink/30 bg-white opacity-70"
+                          }`}
                         >
-                          <span>Desde {t.minQty}u</span>
-                          <span className="font-semibold">{formatARS(t.price)} c/u</span>
+                          <div className="text-xs font-medium text-neutral-500">
+                            desde {tier.minQty}u
+                          </div>
+                          <div className="text-base font-bold text-conquer-navy">
+                            {formatARS(tier.price)}
+                          </div>
+                          <div className="text-[10px] text-neutral-400">c/u</div>
                         </div>
                       );
                     })}
@@ -312,54 +417,67 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
               </div>
             )}
 
-            {/* CTA */}
+            {/* Botón agregar al carrito */}
             <button
               type="button"
               disabled={typeof stock === "number" ? stock <= 0 : false}
-              className="mt-6 w-full h-12 rounded-2xl bg-conquer-orange text-white font-semibold hover:opacity-90 disabled:opacity-50"
-              onClick={() => {
-                addItem(
-                  {
-                    productId: product.id,
-                    slug: product.slug,
-                    name: product.name,
-                    imageUrl: activeImg ?? null,
-                    unitPrice,
-                    method,
-
-                    // ✅ extra (no rompe si tu store lo ignora, pero ideal agregarlo al tipo del carrito)
-                    variantId: selectedVariant?.id ?? null,
-                    variantSku: selectedVariant?.sku ?? null,
-                    variantName: selectedVariant?.colorName ?? null,
-                  } as any,
-                  qty
-                );
-                setAddedMsg(true);
-                setTimeout(() => setAddedMsg(false), 1200);
-              }}
+              onClick={handleAddToCart}
+              className={`mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-lg font-bold text-white transition-all ${
+                addedMsg
+                  ? "scale-105 bg-green-600 shadow-lg"
+                  : "bg-conquer-orange hover:scale-[1.02] hover:shadow-xl"
+              } disabled:bg-neutral-400 disabled:hover:scale-100 disabled:hover:shadow-none`}
             >
-              {typeof stock === "number" && stock <= 0
-                ? "Sin stock"
-                : addedMsg
-                  ? "Agregado ✅"
-                  : "Agregar al carrito"}
+              {addedMsg ? (
+                <>
+                  <CheckCircle className="h-5 w-5 animate-pulse" />
+                  Agregado
+                </>
+              ) : (
+                <>
+                  <ShoppingCart className="h-5 w-5" />
+                  {typeof stock === "number" && stock <= 0 ? "Sin stock" : "Agregar al carrito"}
+                </>
+              )}
             </button>
 
-
-            <div className="mt-3 text-xs text-neutral-500">
-              ¿Dudas? Consultá por WhatsApp: <b>11 3100 2011</b>
+            {/* WhatsApp de consulta */}
+            <div className="mt-4 flex items-center justify-center gap-1 text-xs text-neutral-500">
+              <span>¿Consultas?</span>
+              <a
+                href="https://wa.me/541131002011"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 font-medium text-conquer-navy underline hover:text-conquer-orange"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                WhatsApp 11 3100 2011
+              </a>
             </div>
           </div>
 
-          {/* Bloque confianza */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-3xl border border-conquer-pink bg-white p-4">
-              <div className="text-sm font-semibold text-conquer-navy">Envíos</div>
-              <div className="mt-1 text-sm text-neutral-600">OCA / Moto / Retiro</div>
+          {/* Bloque de confianza */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="flex items-start gap-3 rounded-2xl border border-conquer-pink/40 bg-white p-4 shadow-sm">
+              <Truck className="h-6 w-6 text-conquer-navy" />
+              <div>
+                <h4 className="text-sm font-semibold text-conquer-navy">Envíos</h4>
+                <p className="text-xs text-neutral-600">OCA · Moto · Retiro</p>
+              </div>
             </div>
-            <div className="rounded-3xl border border-conquer-pink bg-white p-4">
-              <div className="text-sm font-semibold text-conquer-navy">Personalización</div>
-              <div className="mt-1 text-sm text-neutral-600">Grabado láser y UV</div>
+            <div className="flex items-start gap-3 rounded-2xl border border-conquer-pink/40 bg-white p-4 shadow-sm">
+              <Shield className="h-6 w-6 text-conquer-navy" />
+              <div>
+                <h4 className="text-sm font-semibold text-conquer-navy">Pagos seguros</h4>
+                <p className="text-xs text-neutral-600">Transferencia · MercadoPago</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 rounded-2xl border border-conquer-pink/40 bg-white p-4 shadow-sm">
+              <Clock className="h-6 w-6 text-conquer-navy" />
+              <div>
+                <h4 className="text-sm font-semibold text-conquer-navy">Atención</h4>
+                <p className="text-xs text-neutral-600">Lun a Vie 9–18hs</p>
+              </div>
             </div>
           </div>
         </section>

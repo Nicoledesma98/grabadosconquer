@@ -12,7 +12,7 @@ export type CartItem = {
 
   unitPrice: number;
   qty: number;
-
+  minQtyStep?: number | null;
   // ✅ variante/color
   variantId?: string | null;
   variantSku?: string | null;
@@ -32,6 +32,11 @@ function makeKey(item: {
 }) {
   return `${item.productId}__${item.variantId ?? "no-variant"}__${item.method ?? "no-method"}`;
 }
+function ceilToStep(qty: number, step: number){
+          const s = Math.max(1, Number(step || 1));
+          const q = Math.max(1, Math.floor(Number(qty || 1)));
+          return Math.ceil(q / s) * s;
+        }
 
 type CartState = {
   items: CartItem[];
@@ -48,32 +53,48 @@ export const useCart = create<CartState>()(
       items: [],
 
       addItem: (item, qty) => {
-        const q = Math.max(1, qty);
-        const key = makeKey(item);
+  const step = Math.max(1, Number(item.minQtyStep ?? 1));
+  const q = ceilToStep(qty, step);
 
-        const items = get().items;
-        const existing = items.find((i) => i.key === key);
+  const key = makeKey(item);
 
-        if (existing) {
-          set({
-            items: items.map((i) =>
-              i.key === key ? { ...i, qty: i.qty + q, unitPrice: item.unitPrice } : i
-            ),
-          });
-          return;
-        }
+  const items = get().items;
+  const existing = items.find((i) => i.key === key);
 
-        set({ items: [...items, { ...item, key, qty: q }] });
-      },
+  if (existing) {
+    set({
+      items: items.map((i) =>
+        i.key === key
+          ? {
+              ...i,
+              qty: i.qty + q,
+              unitPrice: item.unitPrice,
+              minQtyStep: step, // ✅ guardamos/actualizamos
+            }
+          : i
+      ),
+    });
+    return;
+  }
+
+  set({ items: [...items, { ...item, minQtyStep: step, key, qty: q }] });
+},
+
 
       removeItem: (key) => set({ items: get().items.filter((i) => i.key !== key) }),
 
-      setQty: (key, qty) => {
-        const q = Math.max(1, qty);
-        set({
-          items: get().items.map((i) => (i.key === key ? { ...i, qty: q } : i)),
-        });
-      },
+     setQty: (key, qty) => {
+  const items = get().items;
+  const current = items.find((i) => i.key === key);
+
+  const step = Math.max(1, Number(current?.minQtyStep ?? 1));
+  const q = ceilToStep(qty, step);
+
+  set({
+    items: items.map((i) => (i.key === key ? { ...i, qty: q } : i)),
+  });
+},
+
 
       clear: () => set({ items: [] }),
 
