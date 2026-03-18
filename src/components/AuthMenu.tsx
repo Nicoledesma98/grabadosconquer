@@ -124,6 +124,14 @@ export default function AuthButton() {
                 <Building className="h-4 w-4" />
                 Proveedores
               </Link>
+              <Link
+  href="/admin/configuracion"
+  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+  onClick={() => setOpen(false)}
+>
+  <Settings className="h-4 w-4" />
+  Configuración
+</Link>
             </>
           ) : (
             <>

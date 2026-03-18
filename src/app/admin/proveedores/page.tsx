@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import NFSyncButton from "@/components/admin/NFSyncButton";
-
+import StockSurSyncButton from "@/components/admin/StockSurSyncButton";
 export const runtime = "nodejs";
 
 export default async function AdminProveedoresPage() {
@@ -34,10 +34,18 @@ export default async function AdminProveedoresPage() {
         <div className="text-sm text-neutral-600 mt-1">
           Sync (mock desde local)
         </div>
-
         <div className="mt-4">
           <NFSyncButton/>
         </div>
+        <div className="mt-8 rounded-3xl border border-conquer-pink bg-white p-5">
+  <div className="font-semibold text-conquer-navy">Stock Sur (CDO)</div>
+  <div className="text-sm text-neutral-600 mt-1">
+    Sincronización masiva (sin paginación)
+  </div>
+  <div className="mt-4">
+    <StockSurSyncButton />
+  </div>
+</div>
       </div>
     </main>
   );

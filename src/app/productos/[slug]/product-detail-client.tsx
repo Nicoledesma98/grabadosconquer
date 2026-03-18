@@ -222,51 +222,58 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
 
           {/* Variantes (colores) */}
           {variants.length > 0 && (
-            <div className="rounded-3xl border border-conquer-pink bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
-              <div className="flex items-center gap-2 border-b border-conquer-pink/20 pb-3">
-                <SwatchBook className="h-5 w-5 text-conquer-navy" />
-                <h3 className="font-semibold text-conquer-navy">Colores disponibles</h3>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {variants.map((v) => {
-                  const isSelected = v.id === selectedVariant?.id;
-                  return (
-                    <button
-                      key={v.id}
-                      onClick={() => setVariantId(v.id)}
-                      className={`flex items-center gap-2 rounded-full border-2 px-4 py-2 transition-all ${
-                        isSelected
-                          ? "border-conquer-orange bg-conquer-pink/20 shadow-sm"
-                          : "border-conquer-pink/30 hover:border-conquer-turq hover:bg-conquer-pink/10"
-                      }`}
-                    >
-                      <Circle
-                        className="h-5 w-5"
-                        style={{ fill: v.colorHex ?? "#fff", color: v.colorHex ?? "#fff" }}
-                      />
-                      <span className="text-sm font-medium text-conquer-navy">
-                        {v.colorName}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
-                <div className="flex items-center gap-1 text-neutral-600">
-                  <Package className="h-4 w-4" />
-                  SKU: <span className="font-mono">{selectedVariant?.sku ?? "-"}</span>
-                </div>
-                {stockStatus}
-              </div>
-              {selectedVariant?.priceOverride != null && (
-                <div className="mt-3 rounded-xl bg-conquer-pink/10 p-2 text-xs text-conquer-navy">
-                  Precio especial de esta variante:{" "}
-                  <span className="font-bold">{formatARS(selectedVariant.priceOverride)}</span> c/u
-                </div>
-              )}
-            </div>
-          )}
-
+  <div className="rounded-3xl border border-conquer-pink bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+    <div className="flex items-center gap-2 border-b border-conquer-pink/20 pb-3">
+      <SwatchBook className="h-5 w-5 text-conquer-navy" />
+      <h3 className="font-semibold text-conquer-navy">Colores disponibles</h3>
+    </div>
+    <div className="mt-4 flex flex-wrap gap-2">
+      {variants.map((v) => {
+        const isSelected = v.id === selectedVariant?.id;
+        const hasStock = v.stock > 0;
+        return (
+          <button
+            key={v.id}
+            onClick={() => setVariantId(v.id)}
+            className={`flex items-center gap-2 rounded-full border-2 px-4 py-2 transition-all ${
+              isSelected
+                ? "border-conquer-orange bg-conquer-pink/20 shadow-sm"
+                : "border-conquer-pink/30 hover:border-conquer-turq hover:bg-conquer-pink/10"
+            } ${!hasStock ? 'opacity-50' : ''}`}
+            disabled={!hasStock} // opcional: deshabilitar si no hay stock
+          >
+            <Circle
+              className="h-5 w-5"
+              style={{ fill: v.colorHex ?? "#fff", color: v.colorHex ?? "#fff" }}
+            />
+            <span className="text-sm font-medium text-conquer-navy">
+              {v.colorName}
+            </span>
+            {/* Indicador de stock */}
+            <span className={`text-xs font-medium ml-1 ${
+              hasStock ? 'text-green-600' : 'text-red-500'
+            }`}>
+              {hasStock ? `(${v.stock} u.)` : '(agotado)'}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+      <div className="flex items-center gap-1 text-neutral-600">
+        <Package className="h-4 w-4" />
+        SKU: <span className="font-mono">{selectedVariant?.sku ?? "-"}</span>
+      </div>
+      {stockStatus}
+    </div>
+    {selectedVariant?.priceOverride != null && (
+      <div className="mt-3 rounded-xl bg-conquer-pink/10 p-2 text-xs text-conquer-navy">
+        Precio especial de esta variante:{" "}
+        <span className="font-bold">{formatARS(selectedVariant.priceOverride)}</span> c/u
+      </div>
+    )}
+  </div>
+)}
           {/* Personalización */}
           {allowed.length > 0 && (
             <div className="rounded-3xl border border-conquer-pink bg-white p-5 shadow-sm transition-shadow hover:shadow-md">

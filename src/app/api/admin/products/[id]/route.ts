@@ -51,8 +51,10 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  
   const { id } = await ctx.params;
   const body = await req.json();
+  console.log("PATCH body recibido:", body);
 
   const name = String(body.name ?? "").trim();
   const slugRaw = String(body.slug ?? "").trim();
@@ -148,6 +150,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     },
     select: { id: true, allowedMethods: true, stock: true }, // ✅ devolvemos para confirmar
   });
-
+    console.log("Producto actualizado:", updated);
   return Response.json(updated);
 }

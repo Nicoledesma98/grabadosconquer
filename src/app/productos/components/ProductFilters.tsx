@@ -1,12 +1,10 @@
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   SlidersHorizontal,
   X,
-  ChevronDown,
-  Filter,
   ArrowUpDown,
   Tag,
   Package,
@@ -39,40 +37,54 @@ export default function ProductFilters() {
   const [inStock, setInStock] = useState(searchParams.get("inStock") === "true");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Crear nueva URL con los parámetros actualizados
-  const updateFilters = useCallback(() => {
+  // Ref para evitar navegar cuando los parámetros no cambian
+  const isFirstRender = useRef(true);
+
+  // Función para construir los nuevos parámetros
+  const buildParams = useCallback(() => {
     const params = new URLSearchParams(searchParams);
-
-    // Actualizar sort
     params.set("sort", sort);
-
-    // Precios
     if (minPrice) params.set("minPrice", minPrice);
     else params.delete("minPrice");
-
     if (maxPrice) params.set("maxPrice", maxPrice);
     else params.delete("maxPrice");
-
-    // Stock
     if (inStock) params.set("inStock", "true");
     else params.delete("inStock");
+    params.delete("page"); // resetear a página 1
+    return params;
+  }, [searchParams, sort, minPrice, maxPrice, inStock]);
 
-    // Resetear a página 1 al cambiar filtros
-    params.delete("page");
+  // Navegar solo si los parámetros cambiaron realmente
+ const navigateWithParams = useCallback(() => {
+  const newParams = buildParams(); // sin page
+  const currentParams = new URLSearchParams(searchParams);
+  // Eliminamos page de currentParams para la comparación
+  currentParams.delete("page");
+  // Ordenar para comparación consistente
+  newParams.sort();
+  currentParams.sort();
+  if (newParams.toString() !== currentParams.toString()) {
+    router.push(`${pathname}?${newParams.toString()}`);
+  }
+}, [buildParams, pathname, router, searchParams]);
 
-    router.push(`${pathname}?${params.toString()}`);
-  }, [router, pathname, searchParams, sort, minPrice, maxPrice, inStock]);
-
-  // Debounce para precio (evitar muchas navegaciones)
+  // Efecto para sort e inStock (sin debounce)
   useEffect(() => {
-    const timer = setTimeout(updateFilters, 500);
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    navigateWithParams();
+  }, [sort, inStock, navigateWithParams]);
+
+  // Efecto con debounce para precios
+  useEffect(() => {
+    if (isFirstRender.current) return;
+    const timer = setTimeout(() => {
+      navigateWithParams();
+    }, 500);
     return () => clearTimeout(timer);
-  }, [minPrice, maxPrice, updateFilters]);
-
-  // Aplicar cambios inmediatos para sort y stock
-  useEffect(() => {
-    updateFilters();
-  }, [sort, inStock]);
+  }, [minPrice, maxPrice, navigateWithParams]);
 
   // Limpiar todos los filtros
   const clearFilters = () => {
@@ -195,7 +207,7 @@ export default function ProductFilters() {
               </label>
             </div>
 
-            {/* Filtro por categoría (ya existe en la URL, pero podemos mostrarlo aquí) */}
+            {/* Filtro por categoría */}
             <div className="space-y-3">
               <h4 className="flex items-center gap-2 text-sm font-semibold text-conquer-navy">
                 <Tag className="h-4 w-4" />
@@ -217,7 +229,7 @@ export default function ProductFilters() {
                     </button>
                   </span>
                 ) : (
-                  <Link href="/productos?cat=" className="text-conquer-orange hover:underline">
+                  <Link href="/productos" className="text-conquer-orange hover:underline">
                     Seleccionar categoría
                   </Link>
                 )}

@@ -223,7 +223,21 @@ export default async function ProductosPage({
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {products.map((product) => {
                 const img = product.images[0]?.url;
-                const price = product.priceTiers[0]?.price ?? product.basePrice ?? 0;
+                //const price = product.priceTiers[0]?.price ?? product.basePrice ?? 0;
+                // Dentro del map, después de obtener el producto
+const isSurProduct = product.slug.startsWith('sur-'); // identificador de productos sincronizados
+
+let priceDisplay;
+if (isSurProduct && product.variants.length > 0) {
+  // Precio mínimo entre variantes (en centavos) convertido a dólares
+  const minPriceCents = Math.min(...product.variants.map(v => v.priceOverride ?? 0));
+  const minPriceUSD = (minPriceCents / 100).toFixed(2);
+  priceDisplay = `$${minPriceUSD} USD`;
+} else {
+  // Productos normales: usar tiers o basePrice
+  const price = product.priceTiers[0]?.price ?? product.basePrice ?? 0;
+  priceDisplay = formatARS(price);
+}
                 const isNew =
                   new Date(product.createdAt).getTime() >
                   Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -232,7 +246,7 @@ export default async function ProductosPage({
                 const hasStock =
                   product.variants.length === 0 ||
                   product.variants.some((v) => v.stock > 0);
-
+                
                 return (
                   <Link
                     key={product.id}
@@ -272,7 +286,7 @@ export default async function ProductosPage({
                       <div className="mt-2 flex items-baseline gap-1">
                         <span className="text-xs text-neutral-500">Desde</span>
                         <span className="text-lg font-bold text-conquer-orange">
-                          {formatARS(price)}
+                          {priceDisplay}
                         </span>
                       </div>
 
@@ -287,7 +301,7 @@ export default async function ProductosPage({
                           {hasStock ? "En stock" : "Sin stock"}
                         </span>
                       </div>
-
+                          
                       {/* Categorías (máx 2) */}
                       {product.categories.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-1">

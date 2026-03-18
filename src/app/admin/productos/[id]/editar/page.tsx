@@ -164,6 +164,17 @@ export default function AdminEditarProductoPage() {
     if (!validateForm()) return;
 
     setSaving(true);
+    console.log("Enviando datos:", {
+  name,
+  slug,
+  description,
+  basePrice,
+  stock,
+  active,
+  categoryIds,
+  allowedMethods,
+  minQtyStep,
+});
     try {
       const res = await fetch(`/api/admin/products/${id}`, {
         method: "PATCH",
