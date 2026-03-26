@@ -27,6 +27,7 @@ type Product = {
   priceTiers: { price: number; minQty: number }[];
   basePrice: number | null;
   createdAt: Date;
+  variants?: { priceOverride?: number | null; stock?: number}[];
 };
 
 export default function FeaturedCarousel({ products }: { products: Product[] }) {
@@ -73,22 +74,39 @@ export default function FeaturedCarousel({ products }: { products: Product[] }) 
         <div className="flex">
           {products.map((product) => {
             const img = product.images[0]?.url;
-            const price = product.priceTiers[0]?.price ?? product.basePrice ?? 0;
+            const isStockSurProduct = product.variants && product.variants.length > 0 && product.priceTiers.length === 0 && product.basePrice === null;
+
+let priceDisplay;
+if (isStockSurProduct && product.variants && product.variants.length > 0) {
+  const positivePrices = product.variants
+    .map(v => v.priceOverride ?? 0)
+    .filter(p => p > 0);
+  if (positivePrices.length > 0) {
+    const minPriceCents = Math.min(...positivePrices);
+    const minPriceARS = minPriceCents / 100;
+    priceDisplay = formatARS(minPriceARS);
+  } else {
+    priceDisplay = formatARS(0);
+  }
+} else {
+  const price = product.priceTiers[0]?.price ?? product.basePrice ?? 0;
+  priceDisplay = formatARS(price);
+}
             const isNew =
               new Date(product.createdAt).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000;
 
             return (
               <div
                 key={product.id}
-                className="flex-[0_0_100%] min-w-0 pl-4 sm:flex-[0_0_50%] lg:flex-[0_0_25%]"
+                className="flex-[0_0_100%] min-w-0 pl-4 py-4 sm:flex-[0_0_50%] lg:flex-[0_0_25%]"
               >
                 <Link
                   href={`/productos/${product.slug}`}
                   className="group block h-full"
                 >
-                  <article className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-conquer-pink/30 bg-white transition-all duration-300 hover:scale-[1.02] hover:border-conquer-orange hover:shadow-xl">
+                  <article className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-conquer-pink/30 bg-white transition-all duration-300 hover:scale-[1.02] hover:border-conquer-orange hover:shadow-xl hover:z-10">
                     {/* Imagen */}
-                    <div className="relative h-48 w-full bg-gradient-to-br from-conquer-pink/10 to-conquer-turq/10">
+                    <div className="relative h-48 w-full bg-white">
                       {img ? (
                         <Image
                           src={img}
@@ -121,7 +139,7 @@ export default function FeaturedCarousel({ products }: { products: Product[] }) 
                       <div className="mt-2 flex items-baseline gap-1">
                         <span className="text-sm text-neutral-600">Desde</span>
                         <span className="text-xl font-bold text-conquer-orange">
-                          {formatARS(price)}
+                          {priceDisplay}
                         </span>
                       </div>
 

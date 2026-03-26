@@ -10,6 +10,9 @@ datasource db {
 enum Role {
   ADMIN
   CUSTOMER
+  VENTAS
+  STOCK
+  REVENDEDOR
 }
 
 enum OrderStatus {
@@ -135,10 +138,9 @@ model Category {
   name String
   active    Boolean  @default(true) 
   order     Int      @default(0)
-  
+  image String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   products Product[]
 }
 

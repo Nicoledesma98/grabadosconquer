@@ -97,31 +97,3 @@ export async function POST(req: Request) {
   return Response.json({ id: product.id });
 }
 
-export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const { id } = await ctx.params;
-
-  const used = await prisma.orderItem.findFirst({
-    where: { productId: id },
-    select: { id: true },
-  });
-
-  if (used) {
-    return Response.json(
-      { error: "Este producto ya tiene pedidos. En vez de borrarlo, desactivalo." },
-      { status: 409 }
-    );
-  }
-
-  await prisma.productImage.deleteMany({ where: { productId: id } });
-  await prisma.priceTier.deleteMany({ where: { productId: id } });
-  await prisma.supplierProduct.deleteMany({ where: { productId: id } });
-
-  await prisma.product.update({
-    where: { id },
-    data: { categories: { set: [] } },
-  });
-
-  await prisma.product.delete({ where: { id } });
-
-  return Response.json({ ok: true });
-}

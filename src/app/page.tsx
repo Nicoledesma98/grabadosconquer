@@ -14,6 +14,7 @@ export default async function HomePage() {
     select: {
       slug: true,
       name: true,
+      image: true,
     },
   });
 

@@ -26,6 +26,7 @@ function formatARS(value: number) {
 }
 
 const VAT_RATE = 0.21;
+const MIN_PURCHASE = 90000;
 
 export default function CarritoPage() {
   const items = useCart((s) => s.items);
@@ -35,6 +36,7 @@ export default function CarritoPage() {
 
   const vatAmount = useMemo(() => Math.round(subtotalNet * VAT_RATE), [subtotalNet]);
   const totalWithVat = useMemo(() => subtotalNet + vatAmount, [subtotalNet, vatAmount]);
+  const meetsMinimum = totalWithVat >= MIN_PURCHASE;
 
   // Si el carrito está vacío
   if (items.length === 0) {
@@ -264,10 +266,23 @@ export default function CarritoPage() {
                 + IVA incluido • Envío no incluido
               </p>
             </div>
+            {!meetsMinimum && (
+              <div className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800 flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <span>
+                  El pedido mínimo es de {formatARS(MIN_PURCHASE)}. Te faltan{" "}
+                  {formatARS(MIN_PURCHASE - totalWithVat)} para continuar.
+                </span>
+              </div>
+            )}
 
             <Link
-              href="/checkout"
-              className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-conquer-orange font-semibold text-white shadow-md transition-all hover:scale-[1.02] hover:shadow-xl"
+              href={meetsMinimum ? "/checkout" : "#"}
+              className={`mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl font-semibold text-white shadow-md transition-all ${
+                meetsMinimum
+                  ? "bg-conquer-orange hover:scale-[1.02] hover:shadow-xl"
+                  : "pointer-events-none bg-neutral-400 opacity-70"
+              }`}
             >
               Finalizar compra
             </Link>

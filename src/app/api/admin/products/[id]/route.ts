@@ -81,8 +81,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!product) return Response.json({ error: "Not found" }, { status: 404 });
 
   const hasVariants = product.variants.length > 0;
-  if (hasVariants && stock !== null) {
-    return Response.json({ error: "Los productos con variantes deben gestionar el stock por variante" }, { status: 400 });
+  if (hasVariants) {
+    stock = null
   }
   const active = body.active !== false;
   const minQtyStep = normalizeMinQtyStep(body.minQtyStep);
@@ -152,4 +152,35 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   });
     console.log("Producto actualizado:", updated);
   return Response.json(updated);
+}
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  // Verificar si el producto tiene pedidos
+  const used = await prisma.orderItem.findFirst({
+    where: { productId: id },
+    select: { id: true },
+  });
+
+  if (used) {
+    return Response.json(
+      { error: "Este producto ya tiene pedidos. En vez de borrarlo, desactivalo." },
+      { status: 409 }
+    );
+  }
+
+  // Borrar en cascada
+  await prisma.productImage.deleteMany({ where: { productId: id } });
+  await prisma.priceTier.deleteMany({ where: { productId: id } });
+  await prisma.supplierProduct.deleteMany({ where: { productId: id } });
+  await prisma.product.update({
+    where: { id },
+    data: { categories: { set: [] } },
+  });
+  await prisma.product.delete({ where: { id } });
+
+  return Response.json({ ok: true });
 }

@@ -134,8 +134,8 @@ export default function AdminEditarProductoPage() {
 
     if (!name.trim()) newErrors.name = "El nombre es requerido";
     if (!slug.trim()) newErrors.slug = "El slug es requerido";
-    else if (!/^[a-z0-9-]+$/.test(slug))
-      newErrors.slug = "Solo minúsculas, números y guiones";
+    else if (!/^[a-zA-Z0-9-]+$/.test(slug))
+      newErrors.slug = "Solo letras, números y guiones";
 
     if (basePrice) {
       const priceNum = Number(basePrice);
@@ -155,6 +155,7 @@ export default function AdminEditarProductoPage() {
     }
 
     setErrors(newErrors);
+    console.log("🔍 Errores de validación:", newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
@@ -164,12 +165,15 @@ export default function AdminEditarProductoPage() {
     if (!validateForm()) return;
 
     setSaving(true);
-    console.log("Enviando datos:", {
+    const isSurProduct = slug.startsWith('sur-');
+    const stockToSend = (hasVariants || isSurProduct) ? null : (stock ? Number(stock) : null);
+  console.log("hasVariants:", hasVariants, "isSurProduct:", isSurProduct, "stockToSend:", stockToSend);
+  console.log("Enviando datos:", {
   name,
   slug,
   description,
   basePrice,
-  stock,
+  stock: stockToSend,
   active,
   categoryIds,
   allowedMethods,
@@ -184,7 +188,7 @@ export default function AdminEditarProductoPage() {
           slug,
           description: description.trim() || null,
           basePrice: basePrice ? Number(basePrice) : null,
-          stock: hasVariants ? null : stock ? Number(stock) : null,
+          stock: stockToSend,
           active,
           categoryIds,
           allowedMethods,
@@ -310,6 +314,8 @@ export default function AdminEditarProductoPage() {
     const pRes = await fetch(`/api/admin/products/${id}`);
     const p = (await pRes.json()) as ProductDTO;
     setProduct(p);
+    console.log("Producto cargado:",p)
+    console.log("Variantes:", p.variants)
   }
 
   function toggleCategory(catId: string) {

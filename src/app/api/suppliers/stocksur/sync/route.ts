@@ -1,10 +1,43 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchStockSurPage } from "@/lib/suppliers/stocksur/client";
-import { uploadImageFromUrl } from "@/lib/cloudinary/uploadFromUrl";
+//import { uploadImageFromUrl } from "@/lib/cloudinary/uploadFromUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/--+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+async function getUniqueSlug(baseName: string, existingId?: string): Promise<string> {
+  let slug = slugify(baseName);
+  // Verificar si ya existe algún producto con ese slug
+  let exists = await prisma.product.findFirst({
+    where: { slug, NOT: existingId ? { id: existingId } : undefined }
+  });
+  if (!exists) return slug;
+
+  // Si existe, añadir un sufijo numérico
+  let counter = 1;
+  while (exists) {
+    const candidate = `${slug}-${counter}`;
+    exists = await prisma.product.findFirst({
+      where: { slug: candidate, NOT: existingId ? { id: existingId } : undefined }
+    });
+    if (!exists) return candidate;
+    counter++;
+  }
+  return slug; // fallback
+}
+
 
 async function ensureSupplier() {
   return await prisma.supplier.upsert({
@@ -31,7 +64,25 @@ async function getExchangeRate() {
   const setting = await prisma.setting.findUnique({
     where: { key: "exchange_rate" },
   });
-  return setting ? parseFloat(setting.value) : 1200; // valor por defecto
+  return setting ? parseFloat(setting.value) : 1200;
+}
+async function ensureNovedadesCategory() {
+  const novedadesSlug = "novedades";
+  let category = await prisma.category.findUnique({
+    where: { slug: novedadesSlug },
+  });
+  if (!category) {
+    category = await prisma.category.create({
+      data: {
+        name: "Novedades",
+        slug: novedadesSlug,
+        active: true,
+        order: 0,
+      },
+    });
+    console.log("✅ Categoría 'Novedades' creada automáticamente");
+  }
+  return category;
 }
 
 function calculateFinalPriceInCents(
@@ -39,10 +90,8 @@ function calculateFinalPriceInCents(
   exchangeRate: number,
   rules: { min: number; max: number; multiplier: number }[]
 ): number {
-  // Buscar la regla que aplica según el precio en USD
   const rule = rules.find(r => supplierPriceInUSD >= r.min && supplierPriceInUSD <= r.max);
-  const multiplier = rule ? rule.multiplier : 1.5; // fallback
-
+  const multiplier = rule ? rule.multiplier : 1.5;
   const priceInARS = supplierPriceInUSD * exchangeRate;
   const finalPrice = priceInARS * multiplier;
   return Math.round(finalPrice * 100);
@@ -50,11 +99,8 @@ function calculateFinalPriceInCents(
 
 export async function POST(req: Request) {
   try {
-    // 1. Obtener el exchangeRate del body (opcional, si no viene usamos el de BD)
     const body = await req.json().catch(() => ({}));
     let exchangeRate = body.exchangeRate;
-
-    // 2. Si no vino, lo obtenemos de la BD
     if (!exchangeRate) {
       exchangeRate = await getExchangeRate();
     }
@@ -62,12 +108,9 @@ export async function POST(req: Request) {
     const token = process.env.SS_AUTH_TOKEN;
     if (!token) throw new Error("Falta STOCKSUR_AUTH_TOKEN en .env");
 
-    // 3. Obtener las reglas de precio desde la BD
     const priceRules = await getPriceRules();
-
     const supplier = await ensureSupplier();
-
-    // Obtener productos de la API
+    const novedadesCategory = await ensureNovedadesCategory();
     const data = await fetchStockSurPage(token, 100, 1);
     const rows = data.products;
 
@@ -108,19 +151,22 @@ export async function POST(req: Request) {
       }
 
       if (!product) {
+        // Producto nuevo: se crea con nombre y descripción del proveedor
+        const friendlySlug = await getUniqueSlug(row.name);
         product = await prisma.product.create({
           data: {
             name: row.name,
-            slug: `sur-${row.externalSku}`,
+            slug: friendlySlug,
             description: row.description || null,
             active: true,
+            categories: {
+              connect :[{ id: novedadesCategory.id }],
+            },
           },
         });
       } else {
-        await prisma.product.update({
-          where: { id: product.id },
-          data: { name: row.name, description: row.description },
-        });
+        // Producto existente: no actualizamos nombre ni descripción para conservar personalizaciones
+        // (no se ejecuta ningún update)
       }
 
       await prisma.supplierProduct.update({
@@ -134,37 +180,54 @@ export async function POST(req: Request) {
           where: { sku: varRow.sku, productId: product.id },
         });
 
-        // Calcular precio final usando reglas de BD
         const finalPriceCents = calculateFinalPriceInCents(
           varRow.netPrice,
           exchangeRate,
           priceRules
         );
 
-        // Subir imagen
-        let mainImageUrl = null;
-        if (varRow.images.original) {
-          mainImageUrl = await uploadImageFromUrl(
-            varRow.images.original,
-            `products/${product.id}`
-          );
-        }
-
         const colorName = varRow.color?.name || "Sin color";
         const colorHex = varRow.color?.hexCode || null;
 
         if (!variant) {
-          variant = await prisma.productVariant.create({
-            data: {
-              productId: product.id,
-              sku: varRow.sku,
-              colorName,
-              colorHex,
-              stock: varRow.stock,
-              priceOverride: finalPriceCents,
-            },
-          });
-        } else {
+  // Variante nueva: usamos la imagen original del proveedor a través de Cloudinary fetch
+  let mainImageUrl = null;
+  if (varRow.images.original) {
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    if (cloudName) {
+      const encodedUrl = encodeURIComponent(varRow.images.original);
+      mainImageUrl = `https://res.cloudinary.com/${cloudName}/image/fetch/${encodedUrl}`;
+    } else {
+      // Fallback: usar la URL original directamente
+      mainImageUrl = varRow.images.original;
+    }
+  }
+
+  variant = await prisma.productVariant.create({
+    data: {
+      productId: product.id,
+      sku: varRow.sku,
+      colorName,
+      colorHex,
+      stock: varRow.stock,
+      priceOverride: finalPriceCents,
+    },
+  });
+
+  // Guardar imagen principal si se pudo obtener una URL
+  if (mainImageUrl) {
+    await prisma.productImage.create({
+      data: {
+        productId: product.id,
+        variantId: variant.id,
+        url: mainImageUrl,
+        alt: row.name,
+        sort: 0,
+      },
+    });
+  }
+} else {
+          // Variante existente: solo actualizamos stock, precio y colores (sin tocar imagen)
           await prisma.productVariant.update({
             where: { id: variant.id },
             data: {
@@ -174,36 +237,14 @@ export async function POST(req: Request) {
               priceOverride: finalPriceCents,
             },
           });
+          // No se sube imagen nueva ni se actualiza ProductImage
         }
 
+        // Vincular SupplierProduct con la variante
         await prisma.supplierProduct.update({
           where: { id: supplierProduct.id },
           data: { variantId: variant.id },
         });
-
-        // Imagen principal
-        if (mainImageUrl) {
-          const existingImage = await prisma.productImage.findFirst({
-            where: { productId: product.id, variantId: variant.id, sort: 0 },
-          });
-
-          if (existingImage) {
-            await prisma.productImage.update({
-              where: { id: existingImage.id },
-              data: { url: mainImageUrl, alt: row.name },
-            });
-          } else {
-            await prisma.productImage.create({
-              data: {
-                productId: product.id,
-                variantId: variant.id,
-                url: mainImageUrl,
-                alt: row.name,
-                sort: 0,
-              },
-            });
-          }
-        }
       }
 
       results.push({

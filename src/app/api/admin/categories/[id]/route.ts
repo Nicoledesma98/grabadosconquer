@@ -40,7 +40,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   try {
     const updated = await prisma.category.update({
       where: { id },
-      data: { name, slug },
+      data: { name, slug, image: body.image || null },
     });
     return Response.json(updated);
   } catch {
@@ -55,12 +55,31 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   const { id } = await ctx.params;
 
   try {
+    // Primero, verificar si la categoría existe y si tiene productos
+    const category = await prisma.category.findUnique({
+      where: { id },
+      include: { products: { select: { id: true }, take: 1 } }, // solo necesitamos saber si hay al menos uno
+    });
+
+    if (!category) {
+      return Response.json({ error: "Categoría no encontrada" }, { status: 404 });
+    }
+
+    if (category.products.length > 0) {
+      return Response.json(
+        { error: "No se puede eliminar la categoría porque tiene productos asociados." },
+        { status: 400 }
+      );
+    }
+
+    // Si no tiene productos, procedemos a eliminar
     await prisma.category.delete({ where: { id } });
     return Response.json({ ok: true });
-  } catch {
+  } catch (error) {
+    console.error("Error al eliminar categoría:", error);
     return Response.json(
-      { error: "No se pudo borrar. Probablemente tiene productos asociados." },
-      { status: 400 }
+      { error: "Error interno al eliminar la categoría" },
+      { status: 500 }
     );
   }
 }

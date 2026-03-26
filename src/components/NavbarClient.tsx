@@ -102,7 +102,7 @@ export default function NavbarClient({ role }: Props) {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-2 text-xs text-conquer-navy/80">
           <span className="flex items-center gap-1.5">
             <Truck className="h-3.5 w-3.5 text-conquer-orange" />
-            Mínimo de compra de $100.000
+            Mínimo de compra de $90.000
           </span>
           <span className="flex items-center gap-1.5">
             <Phone className="h-3.5 w-3.5 text-conquer-turq" />
@@ -135,7 +135,7 @@ export default function NavbarClient({ role }: Props) {
               )}
             </button>
             <Link href="/" className="flex items-center">
-              <div className="relative h-12 w-40 md:h-14 md:w-48">
+              <div className="relative h-44 w-40 md:h-60 md:w-48">
                 <Image
                   src="/brands/logo.png"
                   alt="Grabados Conquer"
@@ -186,7 +186,9 @@ export default function NavbarClient({ role }: Props) {
             </Link>
              
             {/* AuthButton - exactamente como estaba, sin modificaciones */}
-            <AuthButton />
+            <div className="hidden sm:block">
+              <AuthButton />
+            </div>
           </div>
         </div>
       </div>
@@ -215,68 +217,73 @@ export default function NavbarClient({ role }: Props) {
         </div>
       </nav>
 
-      {/* MENÚ MOBILE - fullscreen */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 top-[113px] z-40 bg-white/95 backdrop-blur-md animate-in slide-in-from-top">
-          <div className="flex flex-col p-6 gap-6">
-            {/* Buscador móvil */}
-            <form onSubmit={submitSearch} className="relative">
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar productos..."
-                className="h-12 w-full rounded-full border border-conquer-pink/30 pl-5 pr-12 text-sm outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
-              />
-              <button
-                type="submit"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-conquer-orange p-3 text-white"
-                aria-label="Buscar"
-              >
-                <Search className="h-4 w-4" />
-              </button>
-            </form>
+ {/* MENÚ MOBILE - desplegable debajo del header */}
+{mobileMenuOpen && (
+  <div className="absolute left-0 right-0 top-full z-50 bg-white shadow-xl border-t border-conquer-pink/20 animate-in slide-in-from-top">
+    <div className="p-5 space-y-5">
+      {/* Buscador móvil */}
+      <form onSubmit={submitSearch} className="relative">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar productos..."
+          className="h-12 w-full rounded-full border border-conquer-pink/30 pl-5 pr-12 text-sm outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
+        />
+        <button
+          type="submit"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full bg-conquer-orange p-3 text-white"
+          aria-label="Buscar"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+      </form>
 
-            {/* Links de navegación */}
-            <div className="flex flex-col gap-2">
-              {navLinks.map((link) => {
-                const Icon = link.icon;
-                const isActive = pathname === link.href;
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-medium transition-colors ${
-                      isActive
-                        ? "bg-conquer-orange/10 text-conquer-orange border border-conquer-orange/30"
-                        : "text-conquer-navy hover:bg-conquer-pink/10"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </div>
+      {/* Links de navegación */}
+      <div className="flex flex-col gap-2">
+        {navLinks.map((link) => {
+          const Icon = link.icon;
+          const isActive = pathname === link.href;
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-base font-medium transition-colors ${
+                isActive
+                  ? "bg-conquer-orange/10 text-conquer-orange border border-conquer-orange/30"
+                  : "text-conquer-navy hover:bg-conquer-pink/10"
+              }`}
+            >
+              <Icon className="h-5 w-5" />
+              {link.label}
+            </Link>
+          );
+        })}
+      </div>
+        {/* AuthButton dentro del menú (opcional) */}
+      <div className="pt-4 border-t border-conquer-pink/30">
+        <AuthButton />
+      </div>
+      {/* Contacto rápido */}
+      <div className="pt-4 border-t border-conquer-pink/30">
+        <p className="text-xs text-conquer-navy/70 px-2 pb-2">
+          ¿Necesitas ayuda? Contactanos
+        </p>
+        <a
+          href="https://wa.me/541131002011"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 rounded-2xl px-4 py-3 text-conquer-navy hover:bg-conquer-pink/10"
+        >
+          <Phone className="h-5 w-5" />
+          WhatsApp: 11 3100 2011
+        </a>
+      </div>
 
-            {/* Contacto rápido */}
-            <div className="pt-4 border-t border-conquer-pink/30">
-              <p className="text-xs text-conquer-navy/70 px-2 pb-2">
-                ¿Necesitas ayuda? Contactanos
-              </p>
-              <a
-                href="https://wa.me/541131002011"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-2xl px-4 py-3 text-conquer-navy hover:bg-conquer-pink/10"
-              >
-                <Phone className="h-5 w-5" />
-                WhatsApp: 11 3100 2011
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
+      
+    </div>
+  </div>
+)}
     </header>
   );
 }

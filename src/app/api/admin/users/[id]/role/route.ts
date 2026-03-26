@@ -5,11 +5,14 @@ import { authOptions } from "@/auth";
 
 export const runtime = "nodejs";
 
+// Todos los roles válidos (deben coincidir con el enum de Prisma)
+const ALLOWED_ROLES = ["ADMIN", "CUSTOMER", "VENTAS", "STOCK", "REVENDEDOR"] as const;
+type Role = typeof ALLOWED_ROLES[number];
+
 export async function POST(
   req: Request,
   ctx: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  // ✅ Next 16: params puede ser Promise
   const params = await Promise.resolve(ctx.params as any);
   const targetId = String(params?.id ?? "").trim();
 
@@ -17,7 +20,7 @@ export async function POST(
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
 
-  // ✅ Guard: solo ADMIN (igual que en tus pages)
+  // Guard: solo ADMIN
   const session = await getServerSession(authOptions);
   const myId = String((session?.user as any)?.id ?? "");
   const myRole = String((session?.user as any)?.role ?? "");
@@ -26,7 +29,7 @@ export async function POST(
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  // ✅ Evitar que el admin se cambie a sí mismo
+  // No permitir cambiar el propio rol
   if (myId && myId === targetId) {
     return NextResponse.json(
       { error: "No podés cambiar tu propio rol" },
@@ -34,11 +37,11 @@ export async function POST(
     );
   }
 
-  // Body
   const body = await req.json().catch(() => ({}));
   const role = String(body?.role ?? "").toUpperCase();
 
-  if (role !== "ADMIN" && role !== "CUSTOMER") {
+  // Validar que el rol sea uno de los permitidos
+  if (!ALLOWED_ROLES.includes(role as Role)) {
     return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
   }
 

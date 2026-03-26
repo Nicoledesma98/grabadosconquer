@@ -6,6 +6,7 @@ import { categoryImages, defaultCategoryImage } from "@/lib/categoryImages";
 type Category = {
   slug: string;
   name: string;
+  image?: string | null;
 };
 
 export default function HomeCategories({ categories }: { categories: Category[] }) {
@@ -31,7 +32,7 @@ export default function HomeCategories({ categories }: { categories: Category[] 
       {/* Grid de categorías */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
         {categories.map((cat) => {
-          const imgSrc = categoryImages[cat.slug] || defaultCategoryImage;
+          const imgSrc = cat.image || categoryImages[cat.slug] || defaultCategoryImage;
 
           return (
             <Link

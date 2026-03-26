@@ -11,6 +11,7 @@ export default async function HomeFeatured() {
     include: {
       images: { orderBy: { sort: "asc" }, take: 1 },
       priceTiers: { orderBy: { minQty: "asc" } },
+      variants: true
     },
   });
 
@@ -36,6 +37,5 @@ export default async function HomeFeatured() {
   );
 }
 
-// Acordate de importar Link y ChevronRight de 'lucide-react'
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";

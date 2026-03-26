@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const created = await prisma.category.create({
-      data: { name, slug },
+      data: { name, slug, image: body.image || null },
     });
     return Response.json(created, { status: 201 });
   } catch (e: any) {

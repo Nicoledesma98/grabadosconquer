@@ -291,6 +291,10 @@ export default function CheckoutPage() {
 
   const total = baseTotal + surcharge;
 
+  const MIN_PURCHASE = 90000;
+  const meetsMinimum = total >= MIN_PURCHASE;
+
+
   const needsAddress = shippingMethod !== "PICKUP";
 
   const getFieldError = (field: keyof ValidationErrors): string | null => {
@@ -471,6 +475,32 @@ export default function CheckoutPage() {
       }
       
       clear();
+      // Después de clear(), justo antes de los ifs de paymentMethod
+if (paymentMethod === "MERCADO_PAGO") {
+  // Crear preferencia de Mercado Pago
+  const prefRes = await fetch('/api/create-preference', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      items: [{
+        title: "Compra en Grabados Conquer",
+        quantity: 1,
+        unit_price: total, // total en pesos (número entero, ej: 14640)
+      }],
+      payerEmail: email,
+      externalReference: data.orderId,
+    }),
+  });
+
+  const prefData = await prefRes.json();
+  if (!prefRes.ok) {
+    throw new Error(prefData.error || 'Error al crear la preferencia de pago');
+  }
+
+  // Redirigir al checkout de Mercado Pago
+window.location.href = `https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=${prefData.id}`;
+return; // Importante: salir de la función para que no continúe
+}
 
       if (paymentMethod === "COORDINATE") {
         const msg = encodeURIComponent(
@@ -1219,36 +1249,46 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                {/* Botones finales */}
+               {/* Botones finales */}
                 <div className="space-y-3">
-                  <button
-                    type="button"
-                    disabled={disabledStep3 || loading}
-                    onClick={createOrder}
-                    className="h-14 w-full rounded-2xl bg-conquer-orange text-white font-bold text-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-3 transition-all shadow-md hover:shadow-lg"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Procesando pedido...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-5 h-5" />
-                        Confirmar pedido
-                      </>
-                    )}
-                  </button>
+                {/* Mensaje de mínimo de compra */}
+                {!meetsMinimum && (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-amber-600" />
+                    <span className="text-sm text-amber-800">
+                      El pedido mínimo es de {formatARS(MIN_PURCHASE)}.
+                    </span>
+                  </div>
+  )}
 
-                  <button
-                    type="button"
-                    onClick={handlePrevStep}
-                    className="h-12 w-full rounded-2xl border border-conquer-pink text-conquer-navy font-medium hover:bg-conquer-pink/10 flex items-center justify-center gap-2"
-                  >
-                    <ArrowLeft className="w-5 h-5" />
-                    Volver al paso anterior
-                  </button>
-                </div>
+  <button
+    type="button"
+    disabled={disabledStep3 || loading || !meetsMinimum}
+    onClick={createOrder}
+    className="h-14 w-full rounded-2xl bg-conquer-orange text-white font-bold text-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-3 transition-all shadow-md hover:shadow-lg"
+  >
+    {loading ? (
+      <>
+        <Loader2 className="w-5 h-5 animate-spin" />
+        Procesando pedido...
+      </>
+    ) : (
+      <>
+        <CheckCircle className="w-5 h-5" />
+        Confirmar pedido
+      </>
+    )}
+  </button>
+
+  <button
+    type="button"
+    onClick={handlePrevStep}
+    className="h-12 w-full rounded-2xl border border-conquer-pink text-conquer-navy font-medium hover:bg-conquer-pink/10 flex items-center justify-center gap-2"
+  >
+    <ArrowLeft className="w-5 h-5" />
+    Volver al paso anterior
+  </button>
+</div>
               </div>
             )}
           </div>

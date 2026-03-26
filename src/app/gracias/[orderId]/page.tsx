@@ -54,19 +54,14 @@ export default async function GraciasPage({
                 <div>
                   Alias: <b className="font-mono">{BANK.alias}</b>
                 </div>
-
-                <div className="mt-3 text-xs text-neutral-600">
-                  Importante: en el concepto/nota poné el ID del pedido <b>{orderId}</b>.
-                </div>
               </div>
             </div>
 
             <div className="rounded-3xl border border-conquer-pink p-5">
               <div className="font-semibold text-conquer-navy">Subir comprobante</div>
               <div className="mt-2 text-sm text-neutral-600">
-                Podés subir una imagen o PDF del comprobante. (Se adjunta al pedido para el admin)
+                Te pedimos que subas una captura o imagen del comprobante de pago para poder confirmarlo
               </div>
-
               <div className="mt-4">
                 <TransferProofUploader orderId={orderId} />
               </div>

@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
           throw new Error("Fetch real no implementado todavía (USE_MOCK_SUPPLIER=false).");
         })();
 
-    const rows = normalizeNF(rawItems);
+    const rows = await normalizeNF(rawItems);
 
     let createdProducts = 0;
     let createdVariants = 0;
