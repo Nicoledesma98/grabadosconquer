@@ -106,6 +106,16 @@ model Product {
 
   orderItems OrderItem[] // ✅ agregar esto
 }
+model IntegrationLock {
+  key       String @id
+  isRunning   Boolean   @default(false)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  lastSuccessAt   DateTime?
+  lastError   String?
+  updatedAt   DateTime @updatedAt
+}
+
 
 model ProductVariant {
   id        String @id @default(cuid())
@@ -115,7 +125,7 @@ model ProductVariant {
   colorName String
   colorHex  String?
   stock     Int     @default(0)
-
+  externalVariantId String?
   // opcional si algún color tiene precio distinto
   priceOverride Int?
 
@@ -130,6 +140,7 @@ model ProductVariant {
   supplierMaps SupplierProduct[]
 
   @@index([productId])
+  @@unique([productId, externalVariantId])
 }
 
 model Category {
@@ -160,6 +171,19 @@ model ProductImage {
   @@index([productId])
   @@index([variantId])
 }
+model SupplierSyncState {
+  key     String @id
+  supplierCode    String
+  syncType        String  //import_new | sync_stock_price
+  currentIndex    Int     @default(0)
+  totalRows       Int?
+  status          String   @default("idle") //iddle | running | completed | error
+  lastError       String?
+  lastStartedAt   DateTime?
+  lastFinishedAt  DateTime?
+  updatedAt       DateTime  @updatedAt
+}
+
 model PriceRule {
   id              String @id @default(cuid())
   minUsd          Float //precio minimo en dolares (incluido)
