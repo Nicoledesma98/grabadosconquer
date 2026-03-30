@@ -3,9 +3,9 @@ import motoLocalities from "@/data/motoLocalities.json";
 export type MotoZone = "CABA" | "GBA1" | "GBA2";
 
 export const MOTO_PRICES: Record<MotoZone, number> = {
-  CABA: 4500,
-  GBA1: 6500,
-  GBA2: 8500,
+  CABA: 5000,
+  GBA1: 7500,
+  GBA2: 9000,
 };
 
 // Normaliza para comparar (acentos, mayúsculas, etc.)
