@@ -56,7 +56,7 @@ export default function Footer({
 
             {/* Botón WhatsApp destacado */}
             <a
-              href="https://wa.me/541131002011"
+              href="https://wa.me/541170660569"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 rounded-full bg-conquer-orange px-5 py-3 text-sm font-semibold text-white shadow-md transition-all hover:scale-105 hover:shadow-xl"
@@ -147,7 +147,7 @@ export default function Footer({
             <h3 className="text-base font-bold text-conquer-navy">Contacto</h3>
             <div className="space-y-3 text-sm">
               <a
-                href="https://wa.me/541131002011"
+                href="https://wa.me/541170660569"
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-3 text-neutral-600 transition-colors hover:text-conquer-orange"
@@ -155,7 +155,7 @@ export default function Footer({
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-conquer-pink/20">
                   <Phone className="h-4 w-4" />
                 </span>
-                <span>+54 11 3100-2011</span>
+                <span>+54 11 7066-0569</span>
               </a>
               <a
                 href="mailto:ventas@grabadosconquer.com"

@@ -37,7 +37,7 @@ export default function HomeBenefits() {
     {
       title: "Atención por WhatsApp",
       desc: "Respondemos rápido para cotizaciones y dudas.",
-      badge: "11 3100 2011",
+      badge: "11 7066 0569",
       icon: MessageCircle,
       color: "purple",
     },
@@ -52,7 +52,7 @@ export default function HomeBenefits() {
             Beneficios exclusivos
           </span>
           <h2 className="mt-3 text-2xl font-bold text-conquer-navy md:text-3xl">
-            ¿Por qué comprar con nosotros?
+            ¿Por qué elegirnos?
           </h2>
         </div>
 

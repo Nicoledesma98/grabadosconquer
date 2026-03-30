@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
 import { NextRequest } from "next/server";
 import { sendMail } from "@/lib/mailer";
+import { finalizePaidOrder } from "@/lib/orders/finalize-paid-order";
 
 export const runtime = "nodejs";
 
@@ -40,13 +41,22 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     return Response.json({ error: "Invalid status" }, { status: 400 });
   }
 
-  const updated = await prisma.order.update({
+  let updated;
+
+  if (nextStatusES === "PAGADO") {
+    updated = await finalizePaidOrder(id);
+
+    // finalizePaidOrder ya manda mails y descuenta stock
+    return Response.json({ ok: true, status: updated.status });
+  }
+
+  updated = await prisma.order.update({
     where: { id },
-    data: { status: toPrismaStatus[nextStatusES] }, // ✅ acá está la clave
-    include: { items: true },
+    data: { status: toPrismaStatus[nextStatusES] },
+    include: { items: true, uploads: true },
   });
 
-  // Email al cliente
+  // Email al cliente para estados que NO sean PAGADO
   if (updated.customerEmail) {
     const logo = process.env.MAIL_LOGO_URL || "";
     const appUrl = process.env.APP_URL || "http://localhost:3000";
@@ -81,7 +91,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     });
   }
 
-  // (opcional) avisar al interno
+  // aviso interno para estados que NO sean PAGADO
   const internal = process.env.MAIL_INTERNAL_TO;
   if (internal) {
     await sendMail({

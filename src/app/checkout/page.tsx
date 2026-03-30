@@ -476,31 +476,31 @@ export default function CheckoutPage() {
       
       clear();
       // Después de clear(), justo antes de los ifs de paymentMethod
-if (paymentMethod === "MERCADO_PAGO") {
+//if (paymentMethod === "MERCADO_PAGO") {
   // Crear preferencia de Mercado Pago
-  const prefRes = await fetch('/api/create-preference', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      items: [{
-        title: "Compra en Grabados Conquer",
-        quantity: 1,
-        unit_price: total, // total en pesos (número entero, ej: 14640)
-      }],
-      payerEmail: email,
-      externalReference: data.orderId,
-    }),
-  });
+  //const prefRes = await fetch('/api/create-preference', {
+    //method: 'POST',
+    //headers: { 'Content-Type': 'application/json' },
+    //body: JSON.stringify({
+      //items: [{
+        //title: "Compra en Grabados Conquer",
+        //quantity: 1,
+        //unit_price: total, // total en pesos (número entero, ej: 14640)
+      //}],
+      //payerEmail: email,
+      //externalReference: data.orderId,
+    //}),
+  //});
 
-  const prefData = await prefRes.json();
-  if (!prefRes.ok) {
-    throw new Error(prefData.error || 'Error al crear la preferencia de pago');
-  }
+  //const prefData = await prefRes.json();
+  //if (!prefRes.ok) {
+    //throw new Error(prefData.error || 'Error al crear la preferencia de pago');
+ // }
 
   // Redirigir al checkout de Mercado Pago
-window.location.href = `https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=${prefData.id}`;
-return; // Importante: salir de la función para que no continúe
-}
+//window.location.href = `https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=${prefData.id}`;
+//return; // Importante: salir de la función para que no continúe
+//}
 
       if (paymentMethod === "COORDINATE") {
         const msg = encodeURIComponent(
@@ -512,7 +512,7 @@ return; // Importante: salir de la función para que no continúe
           `• Envío: ${shippingMethod === "PICKUP" ? "Retiro" : shippingMethod === "MOTO" ? `Moto (${motoZone})` : shippingMethod}\n` +
           `• Total: ${formatARS(total)}`
         );
-        window.location.href = `https://wa.me/541131002011?text=${msg}`;
+        window.location.href = `https://wa.me/541170660569?text=${msg}`;
         return;
       }
 
@@ -1182,7 +1182,7 @@ return; // Importante: salir de la función para que no continúe
                         </div>
                       </div>
                     </label>
-
+                    {/*
                     <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
                       paymentMethod === "MERCADO_PAGO" 
                         ? "border-conquer-orange bg-conquer-orange/5" 
@@ -1201,7 +1201,7 @@ return; // Importante: salir de la función para que no continúe
                           <div className="text-xs text-gray-500">+10% recargo</div>
                         </div>
                       </div>
-                    </label>
+                    </label>*/}
 
                     <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
                       paymentMethod === "COORDINATE" 
@@ -1223,7 +1223,7 @@ return; // Importante: salir de la función para que no continúe
                       </div>
                     </label>
                   </div>
-                  
+                  {/*
                   {paymentMethod === "MERCADO_PAGO" && (
                     <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                       <p className="text-sm text-amber-700 flex items-center gap-2">
@@ -1231,7 +1231,7 @@ return; // Importante: salir de la función para que no continúe
                         Se aplica un 10% de recargo por el uso de Mercado Pago.
                       </p>
                     </div>
-                  )}
+                  )}*/}
                 </div>
 
                 {/* Resumen de errores */}
@@ -1334,12 +1334,12 @@ return; // Importante: salir de la función para que no continúe
                     <span className="font-medium">{formatARS(shipping)}</span>
                   </div>
                 )}
-                {surcharge > 0 && (
+                {/*{surcharge > 0 && (
                   <div className="flex justify-between text-sm text-gray-700">
                     <span>Recargo Mercado Pago</span>
                     <span className="font-medium text-amber-600">{formatARS(surcharge)}</span>
                   </div>
-                )}
+                )}*/}
               </div>
 
               <div className="flex justify-between text-lg font-bold text-conquer-navy mt-4 pt-4 border-t border-conquer-pink/60">

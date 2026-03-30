@@ -262,7 +262,14 @@ export async function POST(req: NextRequest) {
         error: "Pago en efectivo solo disponible para retiro en local",
         field: "paymentMethod"
       }, { status: 400 });
+      
     }
+    if (paymentMethod === "MERCADO_PAGO") {
+  return Response.json(
+    { error: "Mercado Pago está temporalmente no disponible" },
+    { status: 400 }
+  );
+}
 
     // -------------------------
     // Totales server-side
@@ -281,178 +288,185 @@ export async function POST(req: NextRequest) {
       paymentMethod === "MERCADO_PAGO" ? Math.round(baseTotal * MP_RATE) : 0;
 
     const total = baseTotal + paymentSurcharge;
-
+        // -------------------------
+    // Validar stock real antes de crear pedido
     // -------------------------
-    // Descontar stock + crear pedido (TRANSACTION)
-    // -------------------------
-
-    // 1) Agrupar cantidades por variante
-    const variantQty = new Map<string, number>();
-
     for (const i of items) {
       const qty = Math.max(1, Number(i.qty || 1));
       const variantId = i.variantId ? String(i.variantId) : null;
+      const productId = String(i.productId);
 
       if (variantId) {
-        variantQty.set(variantId, (variantQty.get(variantId) ?? 0) + qty);
-      }
-    }
-
-    // 2) Transacción
-    const order = await prisma.$transaction(async (tx) => {
-      // 2.a) Validar y descontar stock de variantes
-      for (const [variantId, qty] of variantQty.entries()) {
-        const upd = await tx.productVariant.updateMany({
-          where: {
-            id: variantId,
-            stock: { gte: qty },
-          },
-          data: {
-            stock: { decrement: qty },
-          },
+        const variant = await prisma.productVariant.findUnique({
+          where: { id: variantId },
+          include: { product: true },
         });
 
-        if (upd.count === 0) {
-          // Intentar obtener el producto para dar un mensaje más claro
-          const variant = await tx.productVariant.findUnique({
-            where: { id: variantId },
-            include: { product: true }
-          });
-          
-          if (!variant) {
-            throw new Error(`Variante no encontrada: ${variantId}`);
-          }
-          
-          if (variant.stock < qty) {
-            throw new Error(`Stock insuficiente para "${variant.product.name}". Disponible: ${variant.stock}, Solicitado: ${qty}`);
-          }
-          
-          throw new Error(`Error al actualizar stock para "${variant.product.name}"`);
+        if (!variant) {
+          return Response.json(
+            { error: "Variante no encontrada", field: "variant" },
+            { status: 400 }
+          );
+        }
+
+        if (variant.stock < qty) {
+          return Response.json(
+            {
+              error: `Stock insuficiente para "${variant.product.name}". Disponible: ${variant.stock}, solicitado: ${qty}`,
+              field: "stock",
+            },
+            { status: 400 }
+          );
+        }
+      } else {
+        const product = await prisma.product.findUnique({
+          where: { id: productId },
+        });
+
+        if (!product) {
+          return Response.json(
+            { error: "Producto no encontrado", field: "product" },
+            { status: 400 }
+          );
+        }
+
+        const stock = product.stock ?? 0;
+
+        if (stock < qty) {
+          return Response.json(
+            {
+              error: `Stock insuficiente para "${product.name}". Disponible: ${stock}, solicitado: ${qty}`,
+              field: "stock",
+            },
+            { status: 400 }
+          );
         }
       }
+    }
+    // -------------------------
+    // Crear pedido PENDIENTE
+    // -------------------------
+    const order = await prisma.order.create({
+      data: {
+        ...(userId ? { userId: String(userId) } : {}),
+        status: "PENDING",
 
-      // 2.b) Crear pedido
-      const created = await tx.order.create({
-        data: {
-          ...(userId ? { userId: String(userId) } : {}),
-          customerName,
-          customerEmail,
-          customerPhone,
-          shipLocality,
-          shipPostalCode,
+        customerName,
+        customerEmail,
+        customerPhone,
+        shipLocality,
+        shipPostalCode,
 
-          subtotalNet,
-          vatRate,
-          vatAmount,
-          shipping,
+        subtotalNet,
+        vatRate,
+        vatAmount,
+        shipping,
 
-          paymentMethod: paymentMethod as any,
-          paymentSurcharge,
-          total,
+        paymentMethod: paymentMethod as any,
+        paymentSurcharge,
+        total,
 
-          invoiceType: invoiceType as any,
-          invoiceCuit,
-          invoiceBusinessName,
+        invoiceType: invoiceType as any,
+        invoiceCuit,
+        invoiceBusinessName,
 
-          shippingMethod: shippingMethod as any,
-          motoZone: motoZone ? (motoZone as any) : null,
-          shipStreet,
-          shipNumber,
-          shipApartment,
+        shippingMethod: shippingMethod as any,
+        motoZone: motoZone ? (motoZone as any) : null,
+        shipStreet,
+        shipNumber,
+        shipApartment,
 
-          items: {
-            create: items.map((i: any) => ({
-              productId: String(i.productId),
-              qty: Math.max(1, Number(i.qty || 1)),
-              unitPrice: Math.max(0, Number(i.unitPrice || 0)),
-              lineTotal:
-                Math.max(1, Number(i.qty || 1)) * Math.max(0, Number(i.unitPrice || 0)),
-              productName: String(i.productName),
-              productSlug: String(i.productSlug),
+        items: {
+          create: items.map((i: any) => ({
+            productId: String(i.productId),
+            qty: Math.max(1, Number(i.qty || 1)),
+            unitPrice: Math.max(0, Number(i.unitPrice || 0)),
+            lineTotal:
+              Math.max(1, Number(i.qty || 1)) * Math.max(0, Number(i.unitPrice || 0)),
+            productName: String(i.productName),
+            productSlug: String(i.productSlug),
 
-              variantId: i.variantId ? String(i.variantId) : null,
-              variantSku: i.variantSku ? String(i.variantSku) : null,
-              colorName: i.colorName ? String(i.colorName) : null,
-              colorHex: i.colorHex ? String(i.colorHex) : null,
+            variantId: i.variantId ? String(i.variantId) : null,
+            variantSku: i.variantSku ? String(i.variantSku) : null,
+            colorName: i.colorName ? String(i.colorName) : null,
+            colorHex: i.colorHex ? String(i.colorHex) : null,
 
-              method: i.method ?? null,
-              notes: i.notes ? String(i.notes) : null,
-            })),
-          },
-
-          uploads: uploadsToCreate.length > 0 ? { create: uploadsToCreate } : undefined,
+            method: i.method ?? null,
+            notes: i.notes ? String(i.notes) : null,
+          })),
         },
-        include: { items: true, uploads: true },
-      });
 
-      return created;
+        uploads: uploadsToCreate.length > 0 ? { create: uploadsToCreate } : undefined,
+      },
+      include: { items: true, uploads: true },
     });
 
-    // Si llega acá, ya descontó y creó pedido OK ✅
-
     // -------------------------
-    // Emails
+    // Emails SOLO para métodos manuales
     // -------------------------
-    try {
-      const htmlClient = renderOrderCreatedEmail({
-        id: order.id,
-        customerName: order.customerName,
-        customerEmail: order.customerEmail,
-        customerPhone: order.customerPhone,
-        createdAt: order.createdAt,
+    const isMercadoPago = paymentMethod === "MERCADO_PAGO";
 
-        subtotalNet: order.subtotalNet,
-        vatRate: order.vatRate,
-        vatAmount: order.vatAmount,
-        shipping: order.shipping,
-        paymentSurcharge: order.paymentSurcharge,
-        total: order.total,
+    if (!isMercadoPago) {
+      try {
+        const htmlClient = renderOrderCreatedEmail({
+          id: order.id,
+          customerName: order.customerName,
+          customerEmail: order.customerEmail,
+          customerPhone: order.customerPhone,
+          createdAt: order.createdAt,
 
-        paymentMethod: order.paymentMethod,
-        shippingMethod: order.shippingMethod,
-        motoZone: order.motoZone,
+          subtotalNet: order.subtotalNet,
+          vatRate: order.vatRate,
+          vatAmount: order.vatAmount,
+          shipping: order.shipping,
+          paymentSurcharge: order.paymentSurcharge,
+          total: order.total,
 
-        invoiceType: order.invoiceType,
-        invoiceCuit: order.invoiceCuit,
-        invoiceBusinessName: order.invoiceBusinessName,
+          paymentMethod: order.paymentMethod,
+          shippingMethod: order.shippingMethod,
+          motoZone: order.motoZone,
 
-        items: order.items.map((it) => ({
-          qty: it.qty,
-          unitPrice: it.unitPrice,
-          lineTotal: it.lineTotal,
-          productName: it.productName,
-          productSlug: it.productSlug,
-          colorName: it.colorName,
-          colorHex: it.colorHex,
-          variantSku: it.variantSku,
-          method: it.method,
-          notes: it.notes,
-        })),
-        uploads: order.uploads.map((u) => ({
-          type: u.type,
-          url: u.url ?? null,
-          text: u.text ?? null,
-          originalName: u.originalName ?? null,
-        }))
-      });
+          invoiceType: order.invoiceType,
+          invoiceCuit: order.invoiceCuit,
+          invoiceBusinessName: order.invoiceBusinessName,
 
-      await sendMail({
-        to: customerEmail,
-        subject: `✅ Pedido recibido — ${order.id}`,
-        html: htmlClient,
-      });
+          items: order.items.map((it) => ({
+            qty: it.qty,
+            unitPrice: it.unitPrice,
+            lineTotal: it.lineTotal,
+            productName: it.productName,
+            productSlug: it.productSlug,
+            colorName: it.colorName,
+            colorHex: it.colorHex,
+            variantSku: it.variantSku,
+            method: it.method,
+            notes: it.notes,
+          })),
+          uploads: order.uploads.map((u) => ({
+            type: u.type,
+            url: u.url ?? null,
+            text: u.text ?? null,
+            originalName: u.originalName ?? null,
+          })),
+        });
 
-      const internalTo = process.env.MAIL_INTERNAL_TO;
-      if (internalTo) {
         await sendMail({
-          to: internalTo,
-          subject: `🧾 Nuevo pedido — ${order.id}`,
+          to: customerEmail,
+          subject: `🧾 Pedido recibido — ${order.id} (pendiente de confirmación)`,
           html: htmlClient,
         });
+
+        const internalTo = process.env.MAIL_INTERNAL_TO;
+        if (internalTo) {
+          await sendMail({
+            to: internalTo,
+            subject: `🧾 Nuevo pedido pendiente — ${order.id}`,
+            html: htmlClient,
+          });
+        }
+      } catch (e: any) {
+        console.error("EMAIL_ERROR", e);
       }
-    } catch (e: any) {
-      console.error("EMAIL_ERROR", e);
-      // No fallar la orden si el email falla
     }
 
     return Response.json({
@@ -460,6 +474,7 @@ export async function POST(req: NextRequest) {
       orderId: order.id,
       paymentMethod: order.paymentMethod,
       total: order.total,
+      status: order.status,
     });
 
   } catch (error: any) {

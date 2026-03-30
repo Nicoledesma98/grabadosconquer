@@ -107,12 +107,12 @@ export default function NavbarClient({ role }: Props) {
           <span className="flex items-center gap-1.5">
             <Phone className="h-3.5 w-3.5 text-conquer-turq" />
             <a
-              href="https://wa.me/541131002011"
+              href="https://wa.me/541170660569"
               target="_blank"
               rel="noopener noreferrer"
               className="hover:text-conquer-orange transition-colors"
             >
-              WhatsApp: 11 3100 2011
+              WhatsApp: 11 7066 0569
             </a>
           </span>
         </div>
@@ -270,13 +270,13 @@ export default function NavbarClient({ role }: Props) {
           ¿Necesitas ayuda? Contactanos
         </p>
         <a
-          href="https://wa.me/541131002011"
+          href="https://wa.me/541170660569"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-3 rounded-2xl px-4 py-3 text-conquer-navy hover:bg-conquer-pink/10"
         >
           <Phone className="h-5 w-5" />
-          WhatsApp: 11 3100 2011
+          WhatsApp: 11 7066 0569
         </a>
       </div>
 
