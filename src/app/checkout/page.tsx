@@ -41,9 +41,9 @@ function formatARS(value: number) {
 
 const VAT_RATE = 0.21;
 
-type ShippingMethod = "PICKUP" | "MOTO" | "OCA" | "VIACARGO";
-type PaymentMethod = "MERCADO_PAGO" | "CASH" | "TRANSFER" | "COORDINATE";
-type InvoiceType = "A" | "B";
+type ShippingMethod = "PICKUP" | "MOTO" | "OCA" | "COORDINATE_INTERIOR";
+type PaymentMethod =   "CASH" | "TRANSFER" | "COORDINATE";
+type InvoiceType = "CONSUMIDOR_FINAL" | "IVA_EXENTO" | "RESPONSABLE_INSCRIPTO";
 
 interface ValidationErrors {
   name?: string;
@@ -56,6 +56,10 @@ interface ValidationErrors {
   shipNumber?: string;
   invoiceCuit?: string;
   invoiceBusinessName?: string;
+  invoiceAddress?: string;
+  invoiceCity?: string;
+  invoicePostalCode?: string;
+
   file?: string;
   general?: string;
 }
@@ -93,10 +97,14 @@ export default function CheckoutPage() {
   const [shipApartment, setShipApartment] = useState("");
 
   // Factura
-  const [invoiceType, setInvoiceType] = useState<InvoiceType>("B");
+  const [invoiceType, setInvoiceType] = useState<InvoiceType>("CONSUMIDOR_FINAL");
   const [invoiceCuit, setInvoiceCuit] = useState("");
   const [invoiceBusinessName, setInvoiceBusinessName] = useState("");
-
+  const [invoiceAddress, setInvoiceAddress] = useState("");
+  const [invoiceCity, setInvoiceCity] = useState("");
+  const [invoicePostalCode, setInvoicePostalCode] = useState("");
+  const [useShippingForInvoice, setUseShippingForInvoice] = useState(false);
+  const needsAddress = shippingMethod !== "PICKUP";
   // Pago
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   
@@ -105,6 +113,32 @@ export default function CheckoutPage() {
       setPaymentMethod("TRANSFER");
     }
   }, [shippingMethod, paymentMethod]);
+  useEffect(() => {
+  if (!needsAddress && useShippingForInvoice) {
+    setUseShippingForInvoice(false);
+  }
+}, [needsAddress, useShippingForInvoice]);
+
+  useEffect(() => {
+  if (!useShippingForInvoice) return;
+
+  const fullAddress = [shipStreet, shipNumber].filter(Boolean).join(" ").trim();
+  setInvoiceAddress(fullAddress);
+  setInvoicePostalCode(shipPostalCode);
+
+  if (shippingMethod === "MOTO") {
+    setInvoiceCity(motoLocality);
+  } else {
+    setInvoiceCity("");
+  }
+}, [
+  useShippingForInvoice,
+  shipStreet,
+  shipNumber,
+  shipPostalCode,
+  motoLocality,
+  shippingMethod,
+]);
 
   const [loading, setLoading] = useState(false);
 
@@ -165,6 +199,7 @@ export default function CheckoutPage() {
     setTouchedFields(prev => new Set(prev).add(field));
     
     if (validationErrors[field as keyof ValidationErrors]) {
+      
       setValidationErrors(prev => ({ ...prev, [field]: undefined }));
     }
     if (submitError) setSubmitError(null);
@@ -239,22 +274,40 @@ export default function CheckoutPage() {
         }
       }
     }
-    
-    if (invoiceType === "A") {
-      if (!invoiceCuit.trim()) {
-        errors.invoiceCuit = "El CUIT es requerido";
-      } else if (!isValidCUIT(invoiceCuit.trim())) {
-        errors.invoiceCuit = "Formato de CUIT inválido (ej: 30-12345678-9 o 30123456789)";
-      }
       
-      if (!invoiceBusinessName.trim()) {
-        errors.invoiceBusinessName = "La razón social es requerida";
-      } else if (invoiceBusinessName.trim().length < 3) {
-        errors.invoiceBusinessName = "Ingrese una razón social válida (mínimo 3 caracteres)";
-      } else if (invoiceBusinessName.trim().length > 200) {
-        errors.invoiceBusinessName = "La razón social es demasiado larga";
-      }
-    }
+    if (!invoiceAddress.trim()) {
+  errors.invoiceAddress = "La dirección de facturación es requerida";
+} else if (invoiceAddress.trim().length > 200) {
+  errors.invoiceAddress = "La dirección es demasiado larga";
+}
+
+if (!invoiceCity.trim()) {
+  errors.invoiceCity = "La localidad de facturación es requerida";
+} else if (invoiceCity.trim().length > 100) {
+  errors.invoiceCity = "La localidad es demasiado larga";
+}
+
+if (!invoicePostalCode.trim()) {
+  errors.invoicePostalCode = "El código postal de facturación es requerido";
+} else if (!isValidPostalCode(invoicePostalCode)) {
+  errors.invoicePostalCode = "Ingrese un código postal válido";
+}
+
+if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
+  if (!invoiceCuit.trim()) {
+    errors.invoiceCuit = "El CUIT es requerido";
+  } else if (!isValidCUIT(invoiceCuit.trim())) {
+    errors.invoiceCuit = "Formato de CUIT inválido (ej: 30-12345678-9 o 30123456789)";
+  }
+
+  if (!invoiceBusinessName.trim()) {
+    errors.invoiceBusinessName = "La razón social es requerida";
+  } else if (invoiceBusinessName.trim().length < 3) {
+    errors.invoiceBusinessName = "Ingrese una razón social válida (mínimo 3 caracteres)";
+  } else if (invoiceBusinessName.trim().length > 200) {
+    errors.invoiceBusinessName = "La razón social es demasiado larga";
+  }
+}
     
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -285,9 +338,7 @@ export default function CheckoutPage() {
 
   const baseTotal = subtotalNet + vatAmount + shipping;
 
-  const surcharge = useMemo(() => {
-    return paymentMethod === "MERCADO_PAGO" ? Math.round(baseTotal * 0.10) : 0;
-  }, [paymentMethod, baseTotal]);
+  const surcharge = 0; ///recordar que cobramos el 10 % de mas cuando es con mercado pago
 
   const total = baseTotal + surcharge;
 
@@ -295,7 +346,7 @@ export default function CheckoutPage() {
   const meetsMinimum = total >= MIN_PURCHASE;
 
 
-  const needsAddress = shippingMethod !== "PICKUP";
+  
 
   const getFieldError = (field: keyof ValidationErrors): string | null => {
     if (validationErrors[field] && touchedFields.has(field)) {
@@ -314,7 +365,20 @@ export default function CheckoutPage() {
 
   async function createOrder() {
     if (!validateStep3()) {
-      const allFields = ['name', 'email', 'phone', 'shipStreet', 'shipNumber', 'shipPostalCode', 'motoLocality', 'invoiceCuit', 'invoiceBusinessName'];
+      const allFields = [
+        'name', 
+        'email', 
+        'phone', 
+        'shipStreet', 
+        'shipNumber', 
+        'shipPostalCode', 
+        'motoLocality', 
+        'invoiceCuit', 
+        'invoiceBusinessName',
+        'invoiceAddress',
+        'invoiceCity',
+        'invoicePostalCode',
+      ];
       setTouchedFields(prev => new Set([...prev, ...allFields]));
       return;
     }
@@ -411,8 +475,11 @@ export default function CheckoutPage() {
         shipApartment: needsAddress ? shipApartment.trim() : null,
 
         invoiceType,
-        invoiceCuit: invoiceType === "A" ? invoiceCuit.replace(/\D/g, '') : null, // Solo números para CUIT
-        invoiceBusinessName: invoiceType === "A" ? invoiceBusinessName.trim() : null,
+invoiceCuit: invoiceCuit.trim() ? invoiceCuit.replace(/\D/g, "") : null,
+invoiceBusinessName: invoiceBusinessName.trim() ? invoiceBusinessName.trim() : null,
+invoiceAddress: invoiceAddress.trim(),
+invoiceCity: invoiceCity.trim(),
+invoicePostalCode: invoicePostalCode.trim(),
 
         paymentMethod,
 
@@ -559,10 +626,13 @@ export default function CheckoutPage() {
       }
     }
     
-    if (invoiceType === "A") {
-      if (!invoiceCuit.trim() || !invoiceBusinessName.trim()) return true;
-      if (!isValidCUIT(invoiceCuit.trim())) return true;
-    }
+    if (!invoiceAddress.trim() || !invoiceCity.trim() || !invoicePostalCode.trim()) return true;
+if (!isValidPostalCode(invoicePostalCode)) return true;
+
+if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
+  if (!invoiceCuit.trim() || !invoiceBusinessName.trim()) return true;
+  if (!isValidCUIT(invoiceCuit.trim())) return true;
+}
     
     return false;
   }, [
@@ -580,6 +650,9 @@ export default function CheckoutPage() {
     invoiceType,
     invoiceCuit,
     invoiceBusinessName,
+    invoiceAddress,
+    invoiceCity,
+    invoicePostalCode,
   ]);
 
   // Renderizado del componente (igual que antes, pero con corrección del error de Phone)
@@ -831,7 +904,7 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {(["PICKUP", "MOTO"] as ShippingMethod[]).map((m) => (
+                    {(["PICKUP", "MOTO", "COORDINATE_INTERIOR"] as ShippingMethod[]).map((m) => (
                       <label 
                         key={m} 
                         className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
@@ -854,13 +927,21 @@ export default function CheckoutPage() {
                             <Truck className="w-5 h-5 text-conquer-navy" />
                           )}
                           <div>
-                            <div className="font-medium text-conquer-navy">
-                              {m === "PICKUP" ? "Retiro en local" : "Envío en moto"}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {m === "PICKUP" ? "Sin costo adicional" : "Consultar zonas"}
-                            </div>
-                          </div>
+  <div className="font-medium text-conquer-navy">
+    {m === "PICKUP"
+      ? "Retiro en local"
+      : m === "MOTO"
+      ? "Envío en moto"
+      : "Coordinar"}
+  </div>
+  <div className="text-xs text-gray-500">
+    {m === "PICKUP"
+      ? "Sin costo adicional"
+      : m === "MOTO"
+      ? ""
+      : "Envios al interior"}
+  </div>
+</div>
                         </div>
                       </label>
                     ))}
@@ -1066,74 +1147,172 @@ export default function CheckoutPage() {
 
                 {/* Facturación */}
                 <div className="mb-6 rounded-2xl border border-conquer-pink p-5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Receipt className="w-5 h-5 text-conquer-navy" />
-                    <h3 className="text-base font-semibold text-conquer-navy">Facturación</h3>
-                  </div>
-                  <div className="flex flex-wrap gap-4 mb-4">
-                    <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
-                      <input 
-                        type="radio" 
-                        checked={invoiceType === "B"} 
-                        onChange={() => setInvoiceType("B")} 
-                        className="text-conquer-orange"
-                      />
-                      <span className="text-sm font-medium">Factura B</span>
-                    </label>
-                    <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
-                      <input 
-                        type="radio" 
-                        checked={invoiceType === "A"} 
-                        onChange={() => setInvoiceType("A")} 
-                        className="text-conquer-orange"
-                      />
-                      <span className="text-sm font-medium">Factura A</span>
-                    </label>
-                  </div>
+  <div className="flex items-center gap-2 mb-4">
+    <Receipt className="w-5 h-5 text-conquer-navy" />
+    <h3 className="text-base font-semibold text-conquer-navy">Facturación</h3>
+  </div>
 
-                  {invoiceType === "A" && (
-                    <div className="mt-4 grid gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Building className="w-4 h-4 text-gray-500" />
-                          <label className="text-sm text-gray-700">CUIT *</label>
-                        </div>
-                        <input
-                          className={getFieldClassName("invoiceCuit")}
-                          placeholder="30-12345678-9 o 30123456789"
-                          value={invoiceCuit}
-                          onChange={(e) => handleFieldChange("invoiceCuit", e.target.value, setInvoiceCuit)}
-                          onBlur={() => setTouchedFields(prev => new Set(prev).add("invoiceCuit"))}
-                        />
-                        {getFieldError("invoiceCuit") && (
-                          <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                            <AlertCircle className="w-4 h-4" />
-                            {getFieldError("invoiceCuit")}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Building className="w-4 h-4 text-gray-500" />
-                          <label className="text-sm text-gray-700">Razón social *</label>
-                        </div>
-                        <input
-                          className={getFieldClassName("invoiceBusinessName")}
-                          placeholder="Empresa S.A."
-                          value={invoiceBusinessName}
-                          onChange={(e) => handleFieldChange("invoiceBusinessName", e.target.value, setInvoiceBusinessName)}
-                          onBlur={() => setTouchedFields(prev => new Set(prev).add("invoiceBusinessName"))}
-                        />
-                        {getFieldError("invoiceBusinessName") && (
-                          <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
-                            <AlertCircle className="w-4 h-4" />
-                            {getFieldError("invoiceBusinessName")}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+  <div className="flex flex-wrap gap-4 mb-4">
+    <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
+      <input
+        type="radio"
+        checked={invoiceType === "CONSUMIDOR_FINAL"}
+        onChange={() => setInvoiceType("CONSUMIDOR_FINAL")}
+        className="text-conquer-orange"
+      />
+      <span className="text-sm font-medium">Consumidor Final</span>
+    </label>
+
+    <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
+      <input
+        type="radio"
+        checked={invoiceType === "IVA_EXENTO"}
+        onChange={() => setInvoiceType("IVA_EXENTO")}
+        className="text-conquer-orange"
+      />
+      <span className="text-sm font-medium">IVA Exento</span>
+    </label>
+
+    <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
+      <input
+        type="radio"
+        checked={invoiceType === "RESPONSABLE_INSCRIPTO"}
+        onChange={() => setInvoiceType("RESPONSABLE_INSCRIPTO")}
+        className="text-conquer-orange"
+      />
+      <span className="text-sm font-medium">Responsable Inscripto </span>
+      <span className="text-xs text-gray-500">(Factura A)</span>
+    </label>
+  </div>
+  {needsAddress && (
+  <label className="flex items-center gap-2 px-4 py-3 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
+    <input
+      type="checkbox"
+      checked={useShippingForInvoice}
+      onChange={(e) => setUseShippingForInvoice(e.target.checked)}
+      className="text-conquer-orange"
+    />
+    <span className="text-sm font-medium text-conquer-navy">
+      Usar los mismos datos del envío para facturación
+    </span>
+  </label>
+)}
+
+  <div className="mt-4 grid gap-4">
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <Building className="w-4 h-4 text-gray-500" />
+        <label className="text-sm text-gray-700">Dirección de facturación *</label>
+      </div>
+      <input
+  className={`${getFieldClassName("invoiceAddress")} ${useShippingForInvoice ? "bg-gray-100 cursor-not-allowed" : ""}`}
+  placeholder="Calle y número"
+  value={invoiceAddress}
+  onChange={(e) => handleFieldChange("invoiceAddress", e.target.value, setInvoiceAddress)}
+  onBlur={() => setTouchedFields(prev => new Set(prev).add("invoiceAddress"))}
+  disabled={useShippingForInvoice}
+/>
+      {getFieldError("invoiceAddress") && (
+        <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
+          <AlertCircle className="w-4 h-4" />
+          {getFieldError("invoiceAddress")}
+        </div>
+      )}
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Building className="w-4 h-4 text-gray-500" />
+          <label className="text-sm text-gray-700">Localidad *</label>
+        </div>
+        <input
+  className={`${getFieldClassName("invoiceCity")} ${useShippingForInvoice ? "bg-gray-100 cursor-not-allowed" : ""}`}
+  placeholder="Localidad"
+  value={invoiceCity}
+  onChange={(e) => handleFieldChange("invoiceCity", e.target.value, setInvoiceCity)}
+  onBlur={() => setTouchedFields(prev => new Set(prev).add("invoiceCity"))}
+  disabled={useShippingForInvoice}
+/>
+        {getFieldError("invoiceCity") && (
+          <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {getFieldError("invoiceCity")}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Building className="w-4 h-4 text-gray-500" />
+          <label className="text-sm text-gray-700">Código Postal *</label>
+        </div>
+        <input
+  className={`${getFieldClassName("invoicePostalCode")} ${useShippingForInvoice ? "bg-gray-100 cursor-not-allowed" : ""}`}
+  placeholder="Código Postal"
+  value={invoicePostalCode}
+  onChange={(e) => handleFieldChange("invoicePostalCode", e.target.value, setInvoicePostalCode)}
+  onBlur={() => setTouchedFields(prev => new Set(prev).add("invoicePostalCode"))}
+  disabled={useShippingForInvoice}
+/>
+        {getFieldError("invoicePostalCode") && (
+          <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {getFieldError("invoicePostalCode")}
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+
+  {(invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") && (
+    <div className="mt-4 grid gap-4">
+  <div>
+    <div className="flex items-center gap-2 mb-2">
+      <Building className="w-4 h-4 text-gray-500" />
+      <label className="text-sm text-gray-700">
+        CUIT {invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO" ? "*" : "(opcional)"}
+      </label>
+    </div>
+    <input
+      className={getFieldClassName("invoiceCuit")}
+      placeholder="30-12345678-9 o 30123456789"
+      value={invoiceCuit}
+      onChange={(e) => handleFieldChange("invoiceCuit", e.target.value, setInvoiceCuit)}
+      onBlur={() => setTouchedFields(prev => new Set(prev).add("invoiceCuit"))}
+    />
+    {getFieldError("invoiceCuit") && (
+      <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
+        <AlertCircle className="w-4 h-4" />
+        {getFieldError("invoiceCuit")}
+      </div>
+    )}
+  </div>
+
+  <div>
+    <div className="flex items-center gap-2 mb-2">
+      <Building className="w-4 h-4 text-gray-500" />
+      <label className="text-sm text-gray-700">
+        Razón social {invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO" ? "*" : "(opcional)"}
+      </label>
+    </div>
+    <input
+      className={getFieldClassName("invoiceBusinessName")}
+      placeholder="Empresa S.A. / Nombre y apellido"
+      value={invoiceBusinessName}
+      onChange={(e) => handleFieldChange("invoiceBusinessName", e.target.value, setInvoiceBusinessName)}
+      onBlur={() => setTouchedFields(prev => new Set(prev).add("invoiceBusinessName"))}
+    />
+    {getFieldError("invoiceBusinessName") && (
+      <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
+        <AlertCircle className="w-4 h-4" />
+        {getFieldError("invoiceBusinessName")}
+      </div>
+    )}
+  </div>
+</div>
+  )}
+</div>
 
                 {/* Pago */}
                 <div className="mb-6 rounded-2xl border border-conquer-pink p-5">
@@ -1359,7 +1538,7 @@ export default function CheckoutPage() {
                       ? "Retiro en nuestro local sin costo adicional." 
                       : shippingMethod === "MOTO"
                       ? `Envío en moto a ${motoLocality || "tu localidad"}.`
-                      : "El costo de envío será informado posteriormente."}
+                      : "Coordinaremos el envío al interior luego de la compra."}
                   </p>
                 </div>
               </div>
@@ -1371,7 +1550,6 @@ export default function CheckoutPage() {
                   <p className="text-xs text-green-600">
                     {paymentMethod === "CASH" && "Pago en efectivo al retirar."}
                     {paymentMethod === "TRANSFER" && "Transferencia bancaria sin recargos."}
-                    {paymentMethod === "MERCADO_PAGO" && "Pago con Mercado Pago con 10% de recargo."}
                     {paymentMethod === "COORDINATE" && "Coordinaremos el pago vía WhatsApp."}
                   </p>
                 </div>

@@ -26,7 +26,7 @@ export default function AdminNuevoProductoPage() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
-  const [basePrice, setBasePrice] = useState<string>("");
+  const [baseUsdPrice, setBaseUsdPrice ] = useState<string>("");
   const [stock, setStock] = useState<string>(""); // 👈 NUEVO
   const [minQtyStep, setMinQtyStep] = useState<number>(1);
   const [active, setActive] = useState(true);
@@ -61,10 +61,10 @@ export default function AdminNuevoProductoPage() {
     if (slug.trim() && !/^[a-z0-9-]+$/.test(slug))
       newErrors.slug = "Solo minúsculas, números y guiones";
 
-    if (basePrice) {
-      const priceNum = Number(basePrice);
+    if (baseUsdPrice) {
+      const priceNum = Number(baseUsdPrice);
       if (isNaN(priceNum) || priceNum < 0)
-        newErrors.basePrice = "Ingrese un precio válido (≥ 0)";
+        newErrors.baseUsdPrice = "Ingrese un valor en USD válido (≥ 0)";
     }
 
     if (stock) {
@@ -106,7 +106,7 @@ export default function AdminNuevoProductoPage() {
           name,
           slug: slug || undefined,
           description: description.trim() || null,
-          basePrice: basePrice ? Number(basePrice) : null,
+          baseUsdPrice: baseUsdPrice ? Number(baseUsdPrice) : null,
           stock: stock ? Number(stock) : null,
           minQtyStep,
           allowedMethods,
@@ -230,23 +230,26 @@ export default function AdminNuevoProductoPage() {
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">$</span>
                 <input
                   className={`h-11 w-full rounded-2xl border pl-8 pr-4 outline-none transition-all focus:ring-2 ${
-                    touched.basePrice && errors.basePrice
+                    touched.baseUsdPrice && errors.baseUsdPrice
                       ? "border-red-500 focus:border-red-500 focus:ring-red-200"
                       : "border-conquer-pink/30 focus:border-conquer-orange focus:ring-conquer-orange/20"
                   }`}
-                  value={basePrice}
-                  onChange={(e) => setBasePrice(e.target.value)}
-                  onBlur={() => handleBlur("basePrice")}
-                  placeholder="0"
-                  inputMode="numeric"
+                  value={baseUsdPrice}
+                  onChange={(e) => setBaseUsdPrice(e.target.value)}
+                  onBlur={() => handleBlur("baseUsdPrice")}
+                  placeholder="0.22"
+                  inputMode="decimal"
                 />
               </div>
-              {touched.basePrice && errors.basePrice && (
+              {touched.baseUsdPrice && errors.baseUsdPrice && (
                 <p className="flex items-center gap-1 text-xs text-red-500">
                   <AlertCircle className="h-3 w-3" />
-                  {errors.basePrice}
+                  {errors.baseUsdPrice}
                 </p>
               )}
+              <p className="text-xs text-neutral-500">
+                El precio final en pesos se calculará automáticamente según el dólar configurando y las reglas de margen.
+              </p>
             </div>
 
             {/* Stock */}

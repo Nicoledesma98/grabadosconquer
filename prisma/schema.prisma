@@ -86,6 +86,7 @@ model Product {
   description String?
   active      Boolean @default(true)
   basePrice   Int?
+  baseUsdPrice  Decimal?  @db.Decimal(10, 2)
   weightGrams Int?
   lenghtMm    Int?
   widthMm     Int?
@@ -274,6 +275,9 @@ model Order {
   invoiceType         InvoiceType    @default(B)
   invoiceCuit         String?
   invoiceBusinessName String?
+  invoiceAddress      String?
+  invoiceCity         String?
+  invoicePostalCode   String?
   //Envio
   shippingMethod      ShippingMethod @default(PICKUP)
   motoZone            MotoZone?

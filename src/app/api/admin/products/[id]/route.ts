@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 
 function normalizeMinQtyStep(v: any) {
   const n = Number(v);
-  return [1,5,10].includes(n) ? n:1;
+  return [1, 5, 10].includes(n) ? n : 1;
 }
 
 function toSlug(input: string) {
@@ -15,18 +15,58 @@ function toSlug(input: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-// ✅ métodos válidos (coinciden con tu enum de Prisma)
 const ALLOWED_METHODS = ["DTF", "DTG", "FULL_COLOR", "LASER"] as const;
 type PersonalizationMethod = (typeof ALLOWED_METHODS)[number];
 
 function normalizeAllowedMethods(input: any): PersonalizationMethod[] {
   if (!Array.isArray(input)) return [];
-  // filtramos solo valores válidos y evitamos duplicados
   const set = new Set<PersonalizationMethod>();
   for (const v of input) {
     if (ALLOWED_METHODS.includes(v)) set.add(v);
   }
   return Array.from(set);
+}
+
+type PriceRule = {
+  min: number;
+  max: number;
+  multiplier: number;
+};
+
+async function getExchangeRate() {
+  const setting = await prisma.setting.findUnique({
+    where: { key: "exchange_rate" },
+  });
+
+  return setting ? parseFloat(setting.value) : 1200;
+}
+
+async function getPriceRules(): Promise<PriceRule[]> {
+  const rules = await prisma.priceRule.findMany({
+    orderBy: { minUsd: "asc" },
+  });
+
+  return rules.map((r) => ({
+    min: r.minUsd,
+    max: r.maxUsd,
+    multiplier: r.multiplier,
+  }));
+}
+
+function calculateFinalPriceInPesos(
+  usdPrice: number,
+  exchangeRate: number,
+  rules: PriceRule[]
+): number {
+  const rule = rules.find(
+    (r) => usdPrice >= r.min && usdPrice <= r.max
+  );
+
+  const multiplier = rule ? rule.multiplier : 1.5;
+  const priceInARS = usdPrice * exchangeRate;
+  const finalPrice = priceInARS * multiplier;
+
+  return Math.round(finalPrice);
 }
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -38,7 +78,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       images: { orderBy: { sort: "asc" } },
       priceTiers: { orderBy: { minQty: "asc" } },
       categories: { orderBy: { name: "asc" } },
-      variants: { orderBy: { createdAt: "asc" } }, // (opcional) si lo necesitás en admin
+      variants: { orderBy: { createdAt: "asc" } },
     },
   });
 
@@ -46,50 +86,50 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
-  // ✅ ya viene allowedMethods porque está en Product
   return Response.json(product);
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  
   const { id } = await ctx.params;
   const body = await req.json();
-  console.log("PATCH body recibido:", body);
 
   const name = String(body.name ?? "").trim();
   const slugRaw = String(body.slug ?? "").trim();
   const description = body.description ? String(body.description).trim() : null;
 
-  const basePrice =
-    body.basePrice === "" || body.basePrice == null ? null : Number(body.basePrice);
-   let stock: number | null = null;
+  const baseUsdPrice =
+    body.baseUsdPrice === "" || body.baseUsdPrice == null
+      ? null
+      : Number(body.baseUsdPrice);
+
+  let stock: number | null = null;
   if (body.stock !== undefined && body.stock !== "") {
     const parsed = Number(body.stock);
     if (!Number.isInteger(parsed) || parsed < 0) {
-      return Response.json({ error: "El stock debe ser un número entero ≥ 0" }, { status: 400 });
+      return Response.json(
+        { error: "El stock debe ser un número entero ≥ 0" },
+        { status: 400 }
+      );
     }
     stock = parsed;
   } else if (body.stock === "") {
-    stock = null; // vacío = sin stock / no gestionado
+    stock = null;
   }
 
-  // Validación: si el producto tiene variantes, el stock debe ser null
   const product = await prisma.product.findUnique({
     where: { id },
     include: { variants: { select: { id: true } } },
   });
+
   if (!product) return Response.json({ error: "Not found" }, { status: 404 });
 
   const hasVariants = product.variants.length > 0;
-  if (hasVariants) {
-    stock = null
-  }
+  if (hasVariants) stock = null;
+
   const active = body.active !== false;
   const minQtyStep = normalizeMinQtyStep(body.minQtyStep);
   const imageUrl = body.imageUrl ? String(body.imageUrl).trim() : "";
   const categoryIds: string[] = Array.isArray(body.categoryIds) ? body.categoryIds : [];
-
-  // ✅ NUEVO
   const allowedMethods = normalizeAllowedMethods(body.allowedMethods);
 
   if (!name) return Response.json({ error: "Name is required" }, { status: 400 });
@@ -97,12 +137,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const slug = slugRaw ? toSlug(slugRaw) : toSlug(name);
   if (!slug) return Response.json({ error: "Invalid slug" }, { status: 400 });
 
-  if (basePrice != null && (!Number.isFinite(basePrice) || basePrice < 0)) {
-    return Response.json({ error: "Invalid basePrice" }, { status: 400 });
+  if (baseUsdPrice == null || !Number.isFinite(baseUsdPrice) || baseUsdPrice < 0) {
+    return Response.json({ error: "Invalid baseUsdPrice" }, { status: 400 });
   }
 
-  // slug único (si cambia)
-  const current = await prisma.product.findUnique({ where: { id }, select: { slug: true } });
+  const current = await prisma.product.findUnique({
+    where: { id },
+    select: { slug: true },
+  });
+
   if (!current) return Response.json({ error: "Not found" }, { status: 404 });
 
   if (current.slug !== slug) {
@@ -110,7 +153,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (exists) return Response.json({ error: "Slug already exists" }, { status: 409 });
   }
 
-  // id de la primera imagen (si existe) para el upsert
+  const exchangeRate = await getExchangeRate();
+  const priceRules = await getPriceRules();
+
+  const finalBasePrice = calculateFinalPriceInPesos(
+    baseUsdPrice,
+    exchangeRate,
+    priceRules
+  );
+
   const firstImg = await prisma.productImage.findFirst({
     where: { productId: id },
     select: { id: true },
@@ -124,16 +175,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       slug,
       minQtyStep,
       description,
-      basePrice: basePrice == null ? null : Math.round(basePrice),
+      baseUsdPrice,
+      basePrice: finalBasePrice,
       active,
       stock: hasVariants ? null : stock,
-      // ✅ NUEVO: guardamos métodos permitidos
       allowedMethods,
-
-      // Reemplazamos categorías por las seleccionadas
       categories: { set: categoryIds.map((cid) => ({ id: cid })) },
-
-      // Imagen: si mandás URL y no hay imagenes, crea 1. Si ya hay, actualiza la primera.
       ...(imageUrl
         ? {
             images: {
@@ -148,39 +195,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           }
         : {}),
     },
-    select: { id: true, allowedMethods: true, stock: true }, // ✅ devolvemos para confirmar
+    select: {
+      id: true,
+      allowedMethods: true,
+      stock: true,
+      baseUsdPrice: true,
+      basePrice: true,
+    },
   });
-    console.log("Producto actualizado:", updated);
+
   return Response.json(updated);
-}
-export async function DELETE(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-
-  // Verificar si el producto tiene pedidos
-  const used = await prisma.orderItem.findFirst({
-    where: { productId: id },
-    select: { id: true },
-  });
-
-  if (used) {
-    return Response.json(
-      { error: "Este producto ya tiene pedidos. En vez de borrarlo, desactivalo." },
-      { status: 409 }
-    );
-  }
-
-  // Borrar en cascada
-  await prisma.productImage.deleteMany({ where: { productId: id } });
-  await prisma.priceTier.deleteMany({ where: { productId: id } });
-  await prisma.supplierProduct.deleteMany({ where: { productId: id } });
-  await prisma.product.update({
-    where: { id },
-    data: { categories: { set: [] } },
-  });
-  await prisma.product.delete({ where: { id } });
-
-  return Response.json({ ok: true });
 }

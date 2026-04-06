@@ -174,99 +174,180 @@ export async function POST(req: NextRequest) {
 
     // -------------------------
     // Shipping / Address
-    // -------------------------
-    const shippingMethod = String(body.shippingMethod ?? "PICKUP");
-    const shipLocality = body.shipLocality ? sanitizeString(String(body.shipLocality)) : null;
-    const shipStreet = body.shipStreet ? sanitizeString(String(body.shipStreet)) : null;
-    const shipNumber = body.shipNumber ? sanitizeString(String(body.shipNumber)) : null;
-    const shipApartment = body.shipApartment ? sanitizeString(String(body.shipApartment)) : null;
+    // 
+const shippingMethod = String(body.shippingMethod ?? "PICKUP");
+const shipLocality = body.shipLocality ? sanitizeString(String(body.shipLocality)) : null;
+const shipStreet = body.shipStreet ? sanitizeString(String(body.shipStreet)) : null;
+const shipNumber = body.shipNumber ? sanitizeString(String(body.shipNumber)) : null;
+const shipApartment = body.shipApartment ? sanitizeString(String(body.shipApartment)) : null;
+const shipPostalCode = body.shipPostalCode ? String(body.shipPostalCode).trim() : null;
 
-    let motoZone: MotoZone | null = null;
-    let shipping = 0;
+if (!["PICKUP", "MOTO", "COORDINATE_INTERIOR"].includes(shippingMethod)) {
+  return Response.json(
+    { error: "Método de envío inválido", field: "shippingMethod" },
+    { status: 400 }
+  );
+}
 
-    if (shippingMethod === "MOTO") {
-      const z = String(body.motoZone ?? "") as MotoZone;
-      const loc = String(body.motoLocality ?? "").trim();
+let motoZone: MotoZone | null = null;
+let shipping = 0;
 
-      if (!loc) {
-        return Response.json({ 
-          error: "Debe seleccionar una localidad para envío en moto",
-          field: "motoLocality"
-        }, { status: 400 });
-      }
+if (shippingMethod === "MOTO") {
+  const z = String(body.motoZone ?? "") as MotoZone;
+  const loc = String(body.motoLocality ?? "").trim();
 
-      const info = getMotoFromLocality(z, loc);
-      if (!info) {
-        return Response.json({ 
-          error: "Localidad no habilitada para envío en moto",
-          field: "motoLocality"
-        }, { status: 400 });
-      }
+  if (!loc) {
+    return Response.json(
+      {
+        error: "Debe seleccionar una localidad para envío en moto",
+        field: "motoLocality",
+      },
+      { status: 400 }
+    );
+  }
 
-      motoZone = info.zone;
-      shipping = info.price;
+  const info = getMotoFromLocality(z, loc);
+  if (!info) {
+    return Response.json(
+      {
+        error: "Localidad no habilitada para envío en moto",
+        field: "motoLocality",
+      },
+      { status: 400 }
+    );
+  }
 
-      if (!shipStreet || !shipNumber) {
-        return Response.json({ 
-          error: "Dirección incompleta para envío",
-          field: shipStreet ? "shipNumber" : "shipStreet"
-        }, { status: 400 });
-      }
-    } else if (shippingMethod === "PICKUP") {
-      shipping = 0;
-    } else {
-      shipping = 0;
-    }
-    const shipPostalCode = body.shipPostalCode ? String(body.shipPostalCode).trim() : null;
+  motoZone = info.zone;
+  shipping = info.price;
 
+  if (!shipStreet || !shipNumber || !shipPostalCode) {
+    return Response.json(
+      {
+        error: "Dirección incompleta para envío",
+        field: !shipStreet ? "shipStreet" : !shipNumber ? "shipNumber" : "shipPostalCode",
+      },
+      { status: 400 }
+    );
+  }
+} else if (shippingMethod === "COORDINATE_INTERIOR") {
+  shipping = 0;
+
+  if (!shipStreet || !shipNumber || !shipPostalCode) {
+    return Response.json(
+      {
+        error: "Dirección incompleta para coordinar envío al interior",
+        field: !shipStreet ? "shipStreet" : !shipNumber ? "shipNumber" : "shipPostalCode",
+      },
+      { status: 400 }
+    );
+  }
+} else {
+  shipping = 0;
+}
     // -------------------------
     // Invoice
     // -------------------------
-    const invoiceType = String(body.invoiceType ?? "B");
-    let invoiceCuit = body.invoiceCuit ? String(body.invoiceCuit).trim() : null;
-    const invoiceBusinessName = body.invoiceBusinessName ? sanitizeString(String(body.invoiceBusinessName)) : null;
+const invoiceType = String(body.invoiceType ?? "CONSUMIDOR_FINAL");
+let invoiceCuit = body.invoiceCuit ? String(body.invoiceCuit).trim() : null;
+const invoiceBusinessName = body.invoiceBusinessName
+  ? sanitizeString(String(body.invoiceBusinessName))
+  : null;
 
-    // Validar facturación
-    if (invoiceType === "A") {
-      if (!invoiceCuit) {
-        return Response.json({ 
-          error: "CUIT requerido para factura A",
-          field: "invoiceCuit"
-        }, { status: 400 });
-      }
-      
-      if (!isValidCUIT(invoiceCuit)) {
-        return Response.json({ 
-          error: "CUIT inválido. Formato: 30-12345678-9 o 30123456789",
-          field: "invoiceCuit"
-        }, { status: 400 });
-      }
-      
-      // Formatear CUIT con guiones para consistencia
-      invoiceCuit = formatCUIT(invoiceCuit);
-      
-      if (!invoiceBusinessName || invoiceBusinessName.length < 3) {
-        return Response.json({ 
-          error: "Razón social requerida para factura A (mínimo 3 caracteres)",
-          field: "invoiceBusinessName"
-        }, { status: 400 });
-      }
-    }
+const invoiceAddress = body.invoiceAddress
+  ? sanitizeString(String(body.invoiceAddress), 255)
+  : null;
+
+const invoiceCity = body.invoiceCity
+  ? sanitizeString(String(body.invoiceCity), 100)
+  : null;
+
+const invoicePostalCode = body.invoicePostalCode
+  ? String(body.invoicePostalCode).trim()
+  : null;
+
+if (
+  !["CONSUMIDOR_FINAL", "IVA_EXENTO", "RESPONSABLE_INSCRIPTO"].includes(invoiceType)
+) {
+  return Response.json(
+    { error: "Tipo de facturación inválido", field: "invoiceType" },
+    { status: 400 }
+  );
+}
+
+if (!invoiceAddress) {
+  return Response.json(
+    { error: "La dirección de facturación es requerida", field: "invoiceAddress" },
+    { status: 400 }
+  );
+}
+
+if (!invoiceCity) {
+  return Response.json(
+    { error: "La localidad de facturación es requerida", field: "invoiceCity" },
+    { status: 400 }
+  );
+}
+
+if (!invoicePostalCode) {
+  return Response.json(
+    { error: "El código postal de facturación es requerido", field: "invoicePostalCode" },
+    { status: 400 }
+  );
+}
+
+// Si vino CUIT, validarlo aunque sea consumidor final
+if (invoiceCuit) {
+  if (!isValidCUIT(invoiceCuit)) {
+    return Response.json(
+      {
+        error: "CUIT inválido. Formato: 30-12345678-9 o 30123456789",
+        field: "invoiceCuit",
+      },
+      { status: 400 }
+    );
+  }
+
+  invoiceCuit = formatCUIT(invoiceCuit);
+}
+
+// Para IVA Exento / Responsable Inscripto sí es obligatorio
+if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
+  if (!invoiceCuit) {
+    return Response.json(
+      { error: "CUIT requerido", field: "invoiceCuit" },
+      { status: 400 }
+    );
+  }
+
+  if (!invoiceBusinessName || invoiceBusinessName.length < 3) {
+    return Response.json(
+      {
+        error: "Razón social requerida (mínimo 3 caracteres)",
+        field: "invoiceBusinessName",
+      },
+      { status: 400 }
+    );
+  }
+}
 
     // -------------------------
     // Payment
     // -------------------------
-    const paymentMethod = String(body.paymentMethod ?? "CASH");
-    if (paymentMethod === "CASH" && shippingMethod !== "PICKUP") {
-      return Response.json({ 
-        error: "Pago en efectivo solo disponible para retiro en local",
-        field: "paymentMethod"
-      }, { status: 400 });
-      
-    }
-    if (paymentMethod === "MERCADO_PAGO") {
+   const paymentMethod = String(body.paymentMethod ?? "CASH");
+
+if (!["CASH", "TRANSFER", "COORDINATE"].includes(paymentMethod)) {
   return Response.json(
-    { error: "Mercado Pago está temporalmente no disponible" },
+    { error: "Método de pago inválido", field: "paymentMethod" },
+    { status: 400 }
+  );
+}
+
+if (paymentMethod === "CASH" && shippingMethod !== "PICKUP") {
+  return Response.json(
+    {
+      error: "Pago en efectivo solo disponible para retiro en local",
+      field: "paymentMethod",
+    },
     { status: 400 }
   );
 }
@@ -284,9 +365,7 @@ export async function POST(req: NextRequest) {
     const vatAmount = Math.round(subtotalNet * vatRate / 100);
 
     const baseTotal = subtotalNet + vatAmount + shipping;
-    const paymentSurcharge =
-      paymentMethod === "MERCADO_PAGO" ? Math.round(baseTotal * MP_RATE) : 0;
-
+    const paymentSurcharge = 0;
     const total = baseTotal + paymentSurcharge;
         // -------------------------
     // Validar stock real antes de crear pedido
@@ -369,6 +448,9 @@ export async function POST(req: NextRequest) {
         invoiceType: invoiceType as any,
         invoiceCuit,
         invoiceBusinessName,
+        invoiceAddress,
+        invoiceCity,
+        invoicePostalCode,
 
         shippingMethod: shippingMethod as any,
         motoZone: motoZone ? (motoZone as any) : null,

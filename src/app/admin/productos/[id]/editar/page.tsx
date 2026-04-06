@@ -36,7 +36,8 @@ type ProductDTO = {
   slug: string;
   description: string | null;
   basePrice: number | null;
-  stock: number | null; // nuevo campo
+  baseUsdPrice: string | number | null;
+  stock: number | null; 
   active: boolean;
   minQtyStep?: number;
   images: { id: string; url: string; alt: string | null; sort: number }[];
@@ -59,7 +60,7 @@ export default function AdminEditarProductoPage() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
-  const [basePrice, setBasePrice] = useState<string>("");
+  const [baseUsdPrice, setBaseUsdPrice] = useState<string>("");
   const [stock, setStock] = useState<string>("");
   const [active, setActive] = useState(true);
   const [minQtyStep, setMinQtyStep] = useState<number>(1);
@@ -107,7 +108,7 @@ export default function AdminEditarProductoPage() {
         setName(p.name);
         setSlug(p.slug);
         setDescription(p.description ?? "");
-        setBasePrice(p.basePrice == null ? "" : String(p.basePrice));
+        setBaseUsdPrice(p.baseUsdPrice == null ? "" : String(p.baseUsdPrice));
         setStock(p.stock == null ? "" : String(p.stock));
         setActive(p.active);
         setMinQtyStep(p.minQtyStep ?? 1);
@@ -137,10 +138,13 @@ export default function AdminEditarProductoPage() {
     else if (!/^[a-zA-Z0-9-]+$/.test(slug))
       newErrors.slug = "Solo letras, números y guiones";
 
-    if (basePrice) {
-      const priceNum = Number(basePrice);
+    if (baseUsdPrice === "") {
+      newErrors.baseUsdPrice = "El costo base en USD es requerido";
+    } else {
+      const priceNum = Number(baseUsdPrice);
+    
       if (isNaN(priceNum) || priceNum < 0)
-        newErrors.basePrice = "Ingrese un precio válido (mayor o igual a 0)";
+        newErrors.baseUsdPrice = "Ingrese un valor en USD válido (mayor o igual a 0)";
     }
 
     // Stock: solo validar si no tiene variantes
@@ -172,7 +176,7 @@ export default function AdminEditarProductoPage() {
   name,
   slug,
   description,
-  basePrice,
+  baseUsdPrice,
   stock: stockToSend,
   active,
   categoryIds,
@@ -187,7 +191,7 @@ export default function AdminEditarProductoPage() {
           name,
           slug,
           description: description.trim() || null,
-          basePrice: basePrice ? Number(basePrice) : null,
+          baseUsdPrice: baseUsdPrice ? Number(baseUsdPrice) : null,
           stock: stockToSend,
           active,
           categoryIds,
@@ -463,32 +467,35 @@ export default function AdminEditarProductoPage() {
             <div className="grid gap-6 md:grid-cols-2">
               {/* Precio base */}
               <div className="space-y-2">
-                <label className="flex items-center gap-1 text-sm font-medium text-conquer-navy">
-                  <DollarSign className="h-4 w-4" />
-                  Precio base
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">$</span>
-                  <input
-                    className={`h-11 w-full rounded-2xl border pl-8 pr-4 outline-none transition-all focus:ring-2 ${
-                      touched.basePrice && errors.basePrice
-                        ? "border-red-500 focus:border-red-500 focus:ring-red-200"
-                        : "border-conquer-pink/30 focus:border-conquer-orange focus:ring-conquer-orange/20"
-                    }`}
-                    value={basePrice}
-                    onChange={(e) => setBasePrice(e.target.value)}
-                    onBlur={() => handleBlur("basePrice")}
-                    inputMode="numeric"
-                    placeholder="0"
-                  />
-                </div>
-                {touched.basePrice && errors.basePrice && (
-                  <p className="flex items-center gap-1 text-xs text-red-500">
-                    <AlertCircle className="h-3 w-3" />
-                    {errors.basePrice}
-                  </p>
-                )}
-              </div>
+  <label className="flex items-center gap-1 text-sm font-medium text-conquer-navy">
+    <DollarSign className="h-4 w-4" />
+    Costo base en USD *
+  </label>
+  <div className="relative">
+    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">USD</span>
+    <input
+      className={`h-11 w-full rounded-2xl border pl-14 pr-4 outline-none transition-all focus:ring-2 ${
+        touched.baseUsdPrice && errors.baseUsdPrice
+          ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+          : "border-conquer-pink/30 focus:border-conquer-orange focus:ring-conquer-orange/20"
+      }`}
+      value={baseUsdPrice}
+      onChange={(e) => setBaseUsdPrice(e.target.value)}
+      onBlur={() => handleBlur("baseUsdPrice")}
+      inputMode="decimal"
+      placeholder="0.22"
+    />
+  </div>
+  {touched.baseUsdPrice && errors.baseUsdPrice && (
+    <p className="flex items-center gap-1 text-xs text-red-500">
+      <AlertCircle className="h-3 w-3" />
+      {errors.baseUsdPrice}
+    </p>
+  )}
+  <p className="text-xs text-neutral-500">
+    El precio final en pesos se recalcula automáticamente según el dólar configurado y las reglas.
+  </p>
+</div>
 
               {/* Stock - solo si no tiene variantes */}
               {!hasVariants && (

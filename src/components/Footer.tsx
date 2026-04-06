@@ -164,7 +164,7 @@ export default function Footer({
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-conquer-pink/20">
                   <Mail className="h-4 w-4" />
                 </span>
-                <span>ventas@grabadosconquer.com</span>
+                <span>info@grabadosconquer.com</span>
               </a>
               <div className="flex items-center gap-3 text-neutral-600">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-conquer-pink/20">
@@ -205,7 +205,7 @@ export default function Footer({
             <div className="pt-2">
               <div className="flex items-center gap-2 text-xs text-conquer-navy/70">
                 <Heart className="h-3.5 w-3.5 text-conquer-pink" />
-                Atención: Lun a Vie 9–18hs
+                Atención: Lun a Vie 9–17hs
               </div>
             </div>
           </div>

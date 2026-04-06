@@ -330,6 +330,7 @@ if (isStockSurProduct && product.variants.length > 0) {
                             <span className="text-lg font-bold text-conquer-orange">
                               {priceDisplay}
                             </span>
+                            <span className="text-xs text-neutral-500">+ IVA</span>
                           </div>
                           <div className="mt-2 flex items-center gap-1">
                             <span

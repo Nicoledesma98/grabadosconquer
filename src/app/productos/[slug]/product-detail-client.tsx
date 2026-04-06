@@ -224,7 +224,7 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
         <section className="space-y-5">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold text-conquer-navy lg:text-4xl">{product.name}</h1>
-            <p className="text-xs text-neutral-500">SKU: {product.slug}</p>
+            <p className="text-xs text-neutral-500 display-none">SKU: {product.slug}</p>
           </div>
 
           <div className="rounded-3xl border-2 border-conquer-pink bg-gradient-to-br from-white to-conquer-pink/5 p-6 shadow-lg">
@@ -246,7 +246,9 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
                 <span className="text-sm font-medium text-neutral-500">Total</span>
                 <div className="mt-1 text-2xl font-bold text-conquer-orange lg:text-3xl">
                   {formatARS(total)}
+                  <span className="text-xs text-neutral-500">+ IVA</span>
                 </div>
+                
               </div>
             </div>
 
@@ -376,13 +378,13 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
             <div className="mt-4 flex items-center justify-center gap-1 text-xs text-neutral-500">
               <span>¿Consultas?</span>
               <a
-                href="https://wa.me/541131002011"
+                href="https://wa.me/541170660569"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 font-medium text-conquer-navy underline hover:text-conquer-orange"
               >
                 <MessageCircle className="h-3.5 w-3.5" />
-                WhatsApp 11 3100 2011
+                WhatsApp 11 7066 0569
               </a>
             </div>
           </div>
@@ -466,10 +468,7 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
               </div>
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
-                <div className="flex items-center gap-1 text-neutral-600">
-                  <Package className="h-4 w-4" />
-                  SKU: <span className="font-mono">{selectedVariant?.sku ?? "-"}</span>
-                </div>
+                
                 {stockStatus}
               </div>
 
@@ -514,7 +513,7 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
               <Clock className="h-6 w-6 text-conquer-navy" />
               <div>
                 <h4 className="text-sm font-semibold text-conquer-navy">Atención</h4>
-                <p className="text-xs text-neutral-600">Lun a Vie 9–18hs</p>
+                <p className="text-xs text-neutral-600">Lun a Vie 9–17hs</p>
               </div>
             </div>
           </div>

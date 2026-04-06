@@ -61,8 +61,7 @@ export default async function GraciasPage({
                     <>
                       <p className="font-medium text-conquer-navy">Pago por transferencia</p>
                       <p className="mt-1">
-                        Te pedimos que adjuntes el comprobante para poder avanzar más rápido con la acreditación.
-                        Si abonaste por Mercado Pago, no es necesario.
+                        Una vez realizado el pago, solicitamos por favor que adjuntes el comprobante a tu orden de compra. Si realizaste el pago mediante Mercado Pago, no te preocupes, ya lo recibimos!
                       </p>
                     </>
                   ) : (
