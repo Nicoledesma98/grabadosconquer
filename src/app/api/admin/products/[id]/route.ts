@@ -79,6 +79,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
       priceTiers: { orderBy: { minQty: "asc" } },
       categories: { orderBy: { name: "asc" } },
       variants: { orderBy: { createdAt: "asc" } },
+      supplierMap: {select: { id: true } },
     },
   });
 
@@ -86,7 +87,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
-  return Response.json(product);
+  return Response.json({
+    ...product,
+  isSupplierProduct: product.supplierMap.length > 0});
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -118,14 +121,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   const product = await prisma.product.findUnique({
     where: { id },
-    include: { variants: { select: { id: true } } },
+    include: { 
+      variants: { select: { id: true } }, 
+      supplierMap: { select: {id: true}},
+    },
   });
 
   if (!product) return Response.json({ error: "Not found" }, { status: 404 });
-
   const hasVariants = product.variants.length > 0;
   if (hasVariants) stock = null;
-
+  const isSupplierProduct = product.supplierMap.length > 0;
   const active = body.active !== false;
   const minQtyStep = normalizeMinQtyStep(body.minQtyStep);
   const imageUrl = body.imageUrl ? String(body.imageUrl).trim() : "";
@@ -137,9 +142,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const slug = slugRaw ? toSlug(slugRaw) : toSlug(name);
   if (!slug) return Response.json({ error: "Invalid slug" }, { status: 400 });
 
-  if (baseUsdPrice == null || !Number.isFinite(baseUsdPrice) || baseUsdPrice < 0) {
+  if (!isSupplierProduct) {
+    if (baseUsdPrice == null || !Number.isFinite(baseUsdPrice) || baseUsdPrice < 0) {
     return Response.json({ error: "Invalid baseUsdPrice" }, { status: 400 });
   }
+  }
+  
 
   const current = await prisma.product.findUnique({
     where: { id },
@@ -153,14 +161,18 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (exists) return Response.json({ error: "Slug already exists" }, { status: 409 });
   }
 
+  let finalBasePrice = product.basePrice;
+
+if (!isSupplierProduct) {
   const exchangeRate = await getExchangeRate();
   const priceRules = await getPriceRules();
 
-  const finalBasePrice = calculateFinalPriceInPesos(
-    baseUsdPrice,
+  finalBasePrice = calculateFinalPriceInPesos(
+    baseUsdPrice as number,
     exchangeRate,
     priceRules
   );
+}
 
   const firstImg = await prisma.productImage.findFirst({
     where: { productId: id },
@@ -175,8 +187,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       slug,
       minQtyStep,
       description,
-      baseUsdPrice,
-      basePrice: finalBasePrice,
+      ...(isSupplierProduct
+    ? {}
+    : {
+        baseUsdPrice,
+        basePrice: finalBasePrice,
+      }),
       active,
       stock: hasVariants ? null : stock,
       allowedMethods,

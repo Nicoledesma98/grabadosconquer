@@ -45,6 +45,7 @@ type ProductDTO = {
   priceTiers: { id: string; minQty: number; price: number }[];
   allowedMethods?: PersonalizationMethod[];
   variants: { id: string }[]; // para saber si tiene variantes
+  isSupplierProduct?: boolean;
 };
 
 export default function AdminEditarProductoPage() {
@@ -138,14 +139,16 @@ export default function AdminEditarProductoPage() {
     else if (!/^[a-zA-Z0-9-]+$/.test(slug))
       newErrors.slug = "Solo letras, números y guiones";
 
-    if (baseUsdPrice === "") {
-      newErrors.baseUsdPrice = "El costo base en USD es requerido";
-    } else {
-      const priceNum = Number(baseUsdPrice);
-    
-      if (isNaN(priceNum) || priceNum < 0)
-        newErrors.baseUsdPrice = "Ingrese un valor en USD válido (mayor o igual a 0)";
+    if (!product?.isSupplierProduct) {
+  if (baseUsdPrice === "") {
+    newErrors.baseUsdPrice = "El costo base en USD es requerido";
+  } else {
+    const priceNum = Number(baseUsdPrice);
+    if (isNaN(priceNum) || priceNum < 0) {
+      newErrors.baseUsdPrice = "Ingrese un valor en USD válido (mayor o igual a 0)";
     }
+  }
+}
 
     // Stock: solo validar si no tiene variantes
     if (!hasVariants) {
@@ -169,9 +172,8 @@ export default function AdminEditarProductoPage() {
     if (!validateForm()) return;
 
     setSaving(true);
-    const isSurProduct = slug.startsWith('sur-');
-    const stockToSend = (hasVariants || isSurProduct) ? null : (stock ? Number(stock) : null);
-  console.log("hasVariants:", hasVariants, "isSurProduct:", isSurProduct, "stockToSend:", stockToSend);
+const stockToSend = (hasVariants || product?.isSupplierProduct) ? null : (stock ? Number(stock) : null);
+  console.log("hasVariants:", hasVariants, "stockToSend:", stockToSend);
   console.log("Enviando datos:", {
   name,
   slug,
@@ -201,13 +203,14 @@ export default function AdminEditarProductoPage() {
       });
 
       const payload = await res.json().catch(() => ({}));
+      console.log("PATCH status:", res.status);
+      console.log("PATCH payload:", payload);
       if (!res.ok) {
         alert(payload?.error || "No se pudo guardar");
         return;
       }
-
+      await refreshProduct();
       alert("Producto guardado ✅");
-      router.refresh();
     } catch (error) {
       console.error(error);
       alert("Error al guardar");
@@ -315,12 +318,23 @@ export default function AdminEditarProductoPage() {
   }
 
   async function refreshProduct() {
-    const pRes = await fetch(`/api/admin/products/${id}`);
-    const p = (await pRes.json()) as ProductDTO;
-    setProduct(p);
-    console.log("Producto cargado:",p)
-    console.log("Variantes:", p.variants)
-  }
+  const pRes = await fetch(`/api/admin/products/${id}`);
+  const p = (await pRes.json()) as ProductDTO;
+
+  setProduct(p);
+  setName(p.name);
+  setSlug(p.slug);
+  setDescription(p.description ?? "");
+  setBaseUsdPrice(p.baseUsdPrice == null ? "" : String(p.baseUsdPrice));
+  setStock(p.stock == null ? "" : String(p.stock));
+  setActive(p.active);
+  setMinQtyStep(p.minQtyStep ?? 1);
+  setAllowedMethods(p.allowedMethods ?? []);
+  setCategoryIds(p.categories.map((x) => x.id));
+
+  console.log("Producto cargado:", p);
+  console.log("Variantes:", p.variants);
+}
 
   function toggleCategory(catId: string) {
     setCategoryIds((prev) =>
@@ -466,7 +480,8 @@ export default function AdminEditarProductoPage() {
             {/* Precio base y Stock (condicional) */}
             <div className="grid gap-6 md:grid-cols-2">
               {/* Precio base */}
-              <div className="space-y-2">
+              {!product?.isSupplierProduct && (
+                <div className="space-y-2">
   <label className="flex items-center gap-1 text-sm font-medium text-conquer-navy">
     <DollarSign className="h-4 w-4" />
     Costo base en USD *
@@ -496,6 +511,7 @@ export default function AdminEditarProductoPage() {
     El precio final en pesos se recalcula automáticamente según el dólar configurado y las reglas.
   </p>
 </div>
+              )}
 
               {/* Stock - solo si no tiene variantes */}
               {!hasVariants && (
