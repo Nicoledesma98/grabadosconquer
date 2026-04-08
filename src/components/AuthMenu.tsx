@@ -151,6 +151,14 @@ export default function AuthButton() {
 
           {role === "VENTAS" && (
             <>
+            <Link
+                href="/admin/productos"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                <Package className="h-4 w-4" />
+                Productos
+              </Link>
               <Link
                 href="/admin/pedidos"
                 className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"

@@ -8,7 +8,7 @@ const routePermissions: Record<string, string[]> = {
   "/admin": ["ADMIN"],
 
   // Subrutas específicas
-  "/admin/productos": ["ADMIN", "STOCK"],        // Stock puede gestionar productos
+  "/admin/productos": ["ADMIN", "STOCK","VENTAS"],        // Stock puede gestionar productos
   "/admin/pedidos": ["ADMIN", "VENTAS"],         // Ventas puede ver pedidos
   "/admin/usuarios": ["ADMIN"],                  // Solo ADMIN
   "/admin/proveedores": ["ADMIN"],               // Solo ADMIN
