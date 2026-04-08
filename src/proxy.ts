@@ -28,7 +28,7 @@ function getAllowedRoles(pathname: string): string[] {
   return prefix ? routePermissions[prefix] : [];
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const url = req.nextUrl;
 
   // Solo protege rutas que empiecen con /admin
