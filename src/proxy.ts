@@ -19,13 +19,13 @@ const routePermissions: Record<string, string[]> = {
 
 // Función para obtener los roles permitidos para una ruta
 function getAllowedRoles(pathname: string): string[] {
-  // Primero coincidencia exacta
   if (routePermissions[pathname]) return routePermissions[pathname];
-  // Si no, buscar por prefijo (ej: /admin/pedidos/123 → coincide con /admin/pedidos)
-  const prefix = Object.keys(routePermissions).find(key =>
-    pathname.startsWith(key + "/") || pathname === key
-  );
-  return prefix ? routePermissions[prefix] : [];
+
+  const matchingKeys = Object.keys(routePermissions)
+    .filter((key) => pathname === key || pathname.startsWith(key + "/"))
+    .sort((a, b) => b.length - a.length); // la más específica primero
+
+  return matchingKeys.length > 0 ? routePermissions[matchingKeys[0]] : [];
 }
 
 export async function proxy(req: NextRequest) {
