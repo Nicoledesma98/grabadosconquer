@@ -31,12 +31,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
     }
 
-    if (order.paymentMethod !== "MERCADO_PAGO") {
-      return NextResponse.json(
-        { error: "El pedido no es de Mercado Pago" },
-        { status: 400 }
-      );
-    }
+    ///if (order.paymentMethod !== "MERCADO_PAGO") {
+      ///return NextResponse.json(
+        ///{ error: "El pedido no es de Mercado Pago" },
+        ///{ status: 400 }
+      ///);
+   /// }
 
     if (order.status !== "PENDING") {
       return NextResponse.json(

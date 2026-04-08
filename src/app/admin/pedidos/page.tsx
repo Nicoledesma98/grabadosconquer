@@ -19,7 +19,7 @@ function prettyPayment(m: string) {
   const x = String(m || "").toUpperCase();
   if (x === "CASH") return "Efectivo";
   if (x === "TRANSFER") return "Transferencia";
-  if (x === "MERCADO_PAGO") return "Mercado Pago";
+  //if (x === "MERCADO_PAGO") return "Mercado Pago";
   if (x === "COORDINATE") return "Coordinar con vendedor";
   return m || "-";
 }
