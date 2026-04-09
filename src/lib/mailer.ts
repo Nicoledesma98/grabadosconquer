@@ -6,6 +6,7 @@ export function getTransport() {
   const user = process.env.SMTP_USER!;
   const pass = process.env.SMTP_PASS!;
 
+  
   return nodemailer.createTransport({
     host,
     port,
@@ -13,7 +14,11 @@ export function getTransport() {
     auth: { user, pass },
   });
 }
-
+export async function testTransport() {
+  const transport = getTransport();
+  await transport.verify();
+  console.log("SMTP OK");
+}
 export async function sendMail(opts: { to: string; subject: string; html: string; replyTo?: string}) {
   const transport = getTransport();
   await transport.sendMail({

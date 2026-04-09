@@ -72,7 +72,7 @@ export default function AdminEditarProductoPage() {
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
 
   // Imágenes
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [newImgUrl, setNewImgUrl] = useState("");
   const [newImgAlt, setNewImgAlt] = useState("");
@@ -239,14 +239,17 @@ const stockToSend = (hasVariants || product?.isSupplierProduct) ? null : (stock 
   }
 
   // Funciones para imágenes, tiers, etc.
-  async function uploadToCloudinary() {
-    if (!uploadFile) return alert("Elegí un archivo primero");
-    setUploading(true);
-    try {
-      const signRes = await fetch("/api/cloudinary/sign", { method: "POST" });
-      const signed = await signRes.json();
+async function uploadToCloudinary() {
+  if (uploadFiles.length === 0) return alert("Elegí al menos una imagen");
+  setUploading(true);
+
+  try {
+    const signRes = await fetch("/api/cloudinary/sign", { method: "POST" });
+    const signed = await signRes.json();
+
+    for (const file of uploadFiles) {
       const form = new FormData();
-      form.append("file", uploadFile);
+      form.append("file", file);
       form.append("api_key", signed.apiKey);
       form.append("timestamp", String(signed.timestamp));
       form.append("signature", signed.signature);
@@ -256,25 +259,36 @@ const stockToSend = (hasVariants || product?.isSupplierProduct) ? null : (stock 
         `https://api.cloudinary.com/v1_1/${signed.cloudName}/auto/upload`,
         { method: "POST", body: form }
       );
+
       const uploaded = await cloudRes.json();
-      if (!cloudRes.ok || !uploaded?.secure_url) throw new Error("Error en Cloudinary");
+      if (!cloudRes.ok || !uploaded?.secure_url) {
+        throw new Error(`Error subiendo ${file.name} a Cloudinary`);
+      }
 
       const saveRes = await fetch(`/api/admin/products/${id}/images`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: uploaded.secure_url, alt: name }),
+        body: JSON.stringify({
+          url: uploaded.secure_url,
+          alt: name,
+        }),
       });
-      if (!saveRes.ok) throw new Error("No se pudo guardar la imagen");
 
-      setUploadFile(null);
-      await refreshProduct();
-    } catch (error) {
-      console.error(error);
-      alert("Error subiendo imagen");
-    } finally {
-      setUploading(false);
+      if (!saveRes.ok) {
+        throw new Error(`No se pudo guardar la imagen ${file.name}`);
+      }
     }
+
+    setUploadFiles([]);
+    await refreshProduct();
+    alert("Imágenes subidas ✅");
+  } catch (error) {
+    console.error(error);
+    alert("Error subiendo imágenes");
+  } finally {
+    setUploading(false);
   }
+}
 
   async function setPrimary(imageId: string) {
     const res = await fetch(`/api/admin/products/${id}/images`, {
@@ -719,13 +733,19 @@ const stockToSend = (hasVariants || product?.isSupplierProduct) ? null : (stock 
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+                  multiple
+                  onChange={(e) => setUploadFiles(Array.from(e.target.files ?? []))}
                   className="flex-1 rounded-full border border-conquer-pink/30 bg-white px-4 py-2 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-conquer-orange file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-conquer-orange/90"
                 />
+                {uploadFiles.length > 0 && (
+                <p className="text-xs text-neutral-600">
+                {uploadFiles.length} imagen{uploadFiles.length > 1 ? "es" : ""} seleccionada{uploadFiles.length > 1 ? "s" : ""}
+                </p>
+                )}
                 <button
                   type="button"
                   onClick={uploadToCloudinary}
-                  disabled={uploading || !uploadFile}
+                  disabled={uploading || uploadFiles.length === 0}
                   className="flex items-center justify-center gap-2 rounded-full bg-conquer-orange px-6 py-2 text-sm font-semibold text-white shadow-md transition-all hover:scale-105 hover:shadow-xl disabled:opacity-50"
                 >
                   {uploading ? (
