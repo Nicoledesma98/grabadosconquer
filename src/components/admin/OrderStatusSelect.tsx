@@ -4,6 +4,17 @@ import { useState } from "react";
 
 const OPTIONS = ["PENDIENTE", "PAGADO", "COMPLETADO", "CANCELADO"] as const;
 
+function normalizeStatus(status: string) {
+  const s = String(status || "").toUpperCase();
+
+  if (s === "PENDING" || s === "PENDIENTE") return "PENDIENTE";
+  if (s === "PAID" || s === "PAGADO") return "PAGADO";
+  if (s === "FULFILLED" || s === "COMPLETADO") return "COMPLETADO";
+  if (s === "CANCELLED" || s === "CANCELADO") return "CANCELADO";
+
+  return "PENDIENTE";
+}
+
 export default function OrderStatusSelect({
   orderId,
   initialStatus,
@@ -11,7 +22,7 @@ export default function OrderStatusSelect({
   orderId: string;
   initialStatus: string;
 }) {
-  const [status, setStatus] = useState(initialStatus);
+  const [status, setStatus] = useState(normalizeStatus(initialStatus));
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -22,12 +33,13 @@ export default function OrderStatusSelect({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
+
       const payload = await res.json().catch(() => ({}));
+
       if (!res.ok) {
         alert(payload?.error || "No se pudo actualizar");
         return;
       }
-      // ok
     } finally {
       setSaving(false);
     }

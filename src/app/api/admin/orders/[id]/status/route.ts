@@ -29,7 +29,9 @@ function statusLabel(es: StatusES) {
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (!token || (token as any).role !== "ADMIN") {
+  const role = (token as any)?.role;
+
+  if (!token || !["ADMIN", "VENTAS"].includes(role)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

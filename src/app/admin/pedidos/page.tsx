@@ -28,6 +28,7 @@ function prettyShipping(m: string) {
   const x = String(m || "").toUpperCase();
   if (x === "PICKUP") return "Retiro";
   if (x === "MOTO") return "Moto";
+  if (x === "COORDINATE_INTERIOR") return "Coordinar envío al interior";
   if (x === "OCA") return "OCA";
   if (x === "VIACARGO") return "Via Cargo";
   return m || "-";
@@ -35,8 +36,9 @@ function prettyShipping(m: string) {
 
 function prettyInvoice(t: string) {
   const x = String(t || "").toUpperCase();
-  if (x === "A") return "Factura A";
-  if (x === "B") return "Factura B";
+  if (x === "CONSUMIDOR_FINAL") return "Consumidor Final";
+  if (x === "IVA_EXENTO") return "IVA Exento";
+  if (x === "RESPONSABLE_INSCRIPTO") return "Responsable Inscripto";
   return t || "-";
 }
 
@@ -50,6 +52,13 @@ function buildUrl(params: Record<string, string | number | undefined | null>) {
   }
   const q = sp.toString();
   return q ? `?${q}` : "";
+}
+function buildUploadUrl(rawUrl: string) {
+  if (!rawUrl) return "#";
+  if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
+
+  const base = process.env.APP_URL || "https://grabadosconquer.com.ar";
+  return new URL(rawUrl, base).toString();
 }
 
 function clamp(n: number, min: number, max: number) {
@@ -286,7 +295,43 @@ export default async function AdminPedidosPage({
                         <span className="text-neutral-500">Factura</span>
                         <b className="text-conquer-navy">{prettyInvoice(String(o.invoiceType))}</b>
                       </div>
+                      {(o.invoiceBusinessName || o.invoiceCuit || o.invoiceAddress || o.invoiceCity || o.invoicePostalCode) && (
+  <div className="mt-2 rounded-2xl border border-conquer-pink/70 p-3 text-sm">
+    <div className="text-xs text-neutral-500 mb-2">Datos de facturación</div>
 
+    <div className="grid gap-1 text-neutral-700">
+      {o.invoiceBusinessName && (
+        <div>
+          <b>Razón social:</b> {o.invoiceBusinessName}
+        </div>
+      )}
+
+      {o.invoiceCuit && (
+        <div>
+          <b>CUIT:</b> {o.invoiceCuit}
+        </div>
+      )}
+
+      {o.invoiceAddress && (
+        <div>
+          <b>Dirección:</b> {o.invoiceAddress}
+        </div>
+      )}
+
+      {o.invoiceCity && (
+        <div>
+          <b>Localidad:</b> {o.invoiceCity}
+        </div>
+      )}
+
+      {o.invoicePostalCode && (
+        <div>
+          <b>CP:</b> {o.invoicePostalCode}
+        </div>
+      )}
+    </div>
+  </div>
+)}
                       {String(o.shippingMethod).toUpperCase() !== "PICKUP" && (
                         <div className="mt-2 rounded-2xl border border-conquer-pink/70 p-3 text-sm">
                           <div className="text-xs text-neutral-500">Dirección</div>
@@ -299,6 +344,12 @@ export default async function AdminPedidosPage({
                           </div>
                           <div className="text-neutral-700">
                             <b>Localidad:</b> {o.shipLocality || "-"}
+                          </div>
+                          <div className="text-neutral-700">
+                            <b>Nombre y Apellido:</b> {o.customerName || "-"}
+                          </div>
+                          <div className="text-neutral-700">
+                            <b>Telefono:</b> {o.customerPhone || "-"}
                           </div>
                         </div>
                       )}
@@ -403,14 +454,24 @@ export default async function AdminPedidosPage({
                                   {u.text ? (
                                     <span>{u.text}</span>
                                   ) : u.url ? (
-                                    <a
-                                      href={u.url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="underline"
-                                    >
-                                      {u.originalName || "Abrir archivo"}
-                                    </a>
+                                    <div className="flex flex-wrap gap-3">
+  <a
+    href={buildUploadUrl(u.url)}
+    target="_blank"
+    rel="noreferrer"
+    className="underline"
+  >
+    Ver archivo
+  </a>
+
+  <a
+    href={buildUploadUrl(u.url)}
+    download={u.originalName || true}
+    className="underline"
+  >
+    Descargar archivo
+  </a>
+</div>
                                   ) : (
                                     "-"
                                   )}
@@ -433,14 +494,24 @@ export default async function AdminPedidosPage({
                               {paymentProofUploads.map((u) => (
                                 <div key={u.id} className="text-neutral-800">
                                   {u.url ? (
-                                    <a
-                                      href={u.url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="underline"
-                                    >
-                                      {u.originalName || "Abrir comprobante"}
-                                    </a>
+                                    <div className="flex flex-wrap gap-3">
+  <a
+    href={buildUploadUrl(u.url)}
+    target="_blank"
+    rel="noreferrer"
+    className="underline"
+  >
+    Ver comprobante
+  </a>
+
+  <a
+    href={buildUploadUrl(u.url)}
+    download={u.originalName || true}
+    className="underline"
+  >
+    Descargar comprobante
+  </a>
+</div>
                                   ) : (
                                     "-"
                                   )}
