@@ -43,6 +43,7 @@ enum PaymentMethod {
   CASH
   TRANSFER
   COORDINATE
+  MERCADO_PAGO
 }
 
 enum InvoiceType {

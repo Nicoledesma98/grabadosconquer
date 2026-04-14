@@ -42,7 +42,7 @@ function formatARS(value: number) {
 const VAT_RATE = 0.21;
 
 type ShippingMethod = "PICKUP" | "MOTO" | "OCA" | "COORDINATE_INTERIOR";
-type PaymentMethod =   "CASH" | "TRANSFER" | "COORDINATE";
+type PaymentMethod =   "CASH" | "TRANSFER" | "COORDINATE" | "MERCADO_PAGO";
 type InvoiceType = "CONSUMIDOR_FINAL" | "IVA_EXENTO" | "RESPONSABLE_INSCRIPTO";
 
 interface ValidationErrors {
@@ -338,7 +338,11 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
 
   const baseTotal = subtotalNet + vatAmount + shipping;
 
-  const surcharge = 0; ///recordar que cobramos el 10 % de mas cuando es con mercado pago
+  const surcharge = useMemo(() => {
+  return paymentMethod === "MERCADO_PAGO"
+    ? Math.round(baseTotal * 0.05)
+    : 0;
+}, [paymentMethod, baseTotal]); ///recordar que cobramos el 10 % de mas cuando es con mercado pago
 
   const total = baseTotal + surcharge;
 
@@ -543,31 +547,25 @@ invoicePostalCode: invoicePostalCode.trim(),
       
       clear();
       // Después de clear(), justo antes de los ifs de paymentMethod
-//if (paymentMethod === "MERCADO_PAGO") {
+if (paymentMethod === "MERCADO_PAGO") {
   // Crear preferencia de Mercado Pago
-  //const prefRes = await fetch('/api/create-preference', {
-    //method: 'POST',
-    //headers: { 'Content-Type': 'application/json' },
-    //body: JSON.stringify({
-      //items: [{
-        //title: "Compra en Grabados Conquer",
-        //quantity: 1,
-        //unit_price: total, // total en pesos (número entero, ej: 14640)
-      //}],
-      //payerEmail: email,
-      //externalReference: data.orderId,
-    //}),
-  //});
+  const prefRes = await fetch("/api/create-preference", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    orderId: data.orderId,
+  }),
+});
 
-  //const prefData = await prefRes.json();
-  //if (!prefRes.ok) {
-    //throw new Error(prefData.error || 'Error al crear la preferencia de pago');
- // }
+const prefData = await prefRes.json();
+if (!prefRes.ok) {
+  throw new Error(prefData.error || 'Error al crear la preferencia de pago');
+ }
 
   // Redirigir al checkout de Mercado Pago
-//window.location.href = `https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=${prefData.id}`;
-//return; // Importante: salir de la función para que no continúe
-//}
+window.location.href = prefData.sandbox_init_point || prefData.init_point; //`https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=${prefData.id}`;
+return; // Importante: salir de la función para que no continúe
+}
 
       if (paymentMethod === "COORDINATE") {
         const msg = encodeURIComponent(
@@ -682,37 +680,42 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
           <div className="rounded-3xl border border-conquer-pink bg-white p-5 md:p-6">
             {/* Stepper */}
             <div className="flex items-center gap-2 mb-6">
-              {[1, 2, 3].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => {
-                    if (n === 1) setStep(1);
-                    if (n === 2 && validateStep1()) setStep(2);
-                    if (n === 3 && validateStep1() && validateStep2()) setStep(3);
-                  }}
-                  className={`flex items-center gap-2 h-10 px-4 rounded-2xl border transition-all ${
-                    step === n 
-                      ? "bg-conquer-orange text-white border-conquer-orange shadow-md" 
-                      : step > n
-                      ? "bg-conquer-pink/10 text-conquer-navy border-conquer-pink"
-                      : "border-conquer-pink text-gray-500 hover:bg-conquer-pink/5"
-                  }`}
-                >
-                  {n === 1 && <ShoppingCart className="w-4 h-4" />}
-                  {n === 2 && <Edit3 className="w-4 h-4" />}
-                  {n === 3 && <Send className="w-4 h-4" />}
-                  <span className="text-sm font-medium">Paso {n}</span>
-                </button>
-              ))}
-            </div>
+  {[1, 2, 3].map((n) => {
+    const stepLabel =
+      n === 1 ? "Productos" : n === 2 ? "Personalización" : "Envío y pago";
+
+    return (
+      <button
+        key={n}
+        type="button"
+        onClick={() => {
+          if (n === 1) setStep(1);
+          if (n === 2 && validateStep1()) setStep(2);
+          if (n === 3 && validateStep1() && validateStep2()) setStep(3);
+        }}
+        className={`flex items-center gap-2 h-10 px-4 rounded-2xl border transition-all ${
+          step === n
+            ? "bg-conquer-orange text-white border-conquer-orange shadow-md"
+            : step > n
+            ? "bg-conquer-pink/10 text-conquer-navy border-conquer-pink"
+            : "border-conquer-pink text-gray-500 hover:bg-conquer-pink/5"
+        }`}
+      >
+        {n === 1 && <ShoppingCart className="w-4 h-4" />}
+        {n === 2 && <Edit3 className="w-4 h-4" />}
+        {n === 3 && <Send className="w-4 h-4" />}
+        <span className="text-sm font-medium">{stepLabel}</span>
+      </button>
+    );
+  })}
+</div>
 
             {/* Paso 1 */}
             {step === 1 && (
               <div className="mt-2">
                 <div className="flex items-center gap-2 mb-4">
                   <ShoppingCart className="w-5 h-5 text-conquer-orange" />
-                  <h2 className="text-lg font-bold text-conquer-navy">1) Carrito</h2>
+                  <h2 className="text-lg font-bold text-conquer-navy">1) Productos Seleccionados</h2>
                 </div>
 
                 <div className="mt-4 space-y-3">
@@ -1361,26 +1364,25 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                         </div>
                       </div>
                     </label>
-                    {/*
                     <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
-                      paymentMethod === "MERCADO_PAGO" 
-                        ? "border-conquer-orange bg-conquer-orange/5" 
-                        : "border-conquer-pink hover:border-conquer-orange/50"
-                    }`}>
-                      <input 
-                        type="radio" 
-                        checked={paymentMethod === "MERCADO_PAGO"} 
-                        onChange={() => setPaymentMethod("MERCADO_PAGO")} 
-                        className="text-conquer-orange"
-                      />
-                      <div className="flex items-center gap-3">
-                        <CreditCard className="w-5 h-5 text-conquer-navy" />
-                        <div>
-                          <div className="font-medium text-conquer-navy">Mercado Pago</div>
-                          <div className="text-xs text-gray-500">+10% recargo</div>
-                        </div>
-                      </div>
-                    </label>*/}
+  paymentMethod === "MERCADO_PAGO" 
+    ? "border-conquer-orange bg-conquer-orange/5" 
+    : "border-conquer-pink hover:border-conquer-orange/50"
+}`}>
+  <input 
+    type="radio" 
+    checked={paymentMethod === "MERCADO_PAGO"} 
+    onChange={() => setPaymentMethod("MERCADO_PAGO")} 
+    className="text-conquer-orange"
+  />
+  <div className="flex items-center gap-3">
+    <CreditCard className="w-5 h-5 text-conquer-navy" />
+    <div>
+      <div className="font-medium text-conquer-navy">Mercado Pago</div>
+      <div className="text-xs text-gray-500">+5% recargo</div>
+    </div>
+  </div>
+</label>
 
                     <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
                       paymentMethod === "COORDINATE" 
@@ -1402,15 +1404,14 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                       </div>
                     </label>
                   </div>
-                  {/*
                   {paymentMethod === "MERCADO_PAGO" && (
                     <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                       <p className="text-sm text-amber-700 flex items-center gap-2">
                         <AlertCircle className="w-4 h-4" />
-                        Se aplica un 10% de recargo por el uso de Mercado Pago.
+                        Se aplica un 5% de recargo por el uso de Mercado Pago.
                       </p>
                     </div>
-                  )}*/}
+                  )}
                 </div>
 
                 {/* Resumen de errores */}
@@ -1513,12 +1514,12 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                     <span className="font-medium">{formatARS(shipping)}</span>
                   </div>
                 )}
-                {/*{surcharge > 0 && (
+                {surcharge > 0 && (
                   <div className="flex justify-between text-sm text-gray-700">
                     <span>Recargo Mercado Pago</span>
                     <span className="font-medium text-amber-600">{formatARS(surcharge)}</span>
                   </div>
-                )}*/}
+                )}
               </div>
 
               <div className="flex justify-between text-lg font-bold text-conquer-navy mt-4 pt-4 border-t border-conquer-pink/60">
@@ -1530,18 +1531,18 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
             {/* Información adicional */}
             <div className="mt-6 space-y-3">
               <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
-                <Truck className="w-5 h-5 text-blue-500 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-blue-800">Envío</p>
-                  <p className="text-xs text-blue-600">
-                    {shippingMethod === "PICKUP" 
-                      ? "Retiro en nuestro local sin costo adicional." 
-                      : shippingMethod === "MOTO"
-                      ? `Envío en moto a ${motoLocality || "tu localidad"}.`
-                      : "Coordinaremos el envío al interior luego de la compra."}
-                  </p>
-                </div>
-              </div>
+  <Truck className="w-5 h-5 text-blue-500 mt-0.5" />
+  <div>
+    <p className="text-sm font-medium text-blue-800">Modalidad de entrega</p>
+    <p className="text-xs text-blue-600">
+      {shippingMethod === "PICKUP"
+        ? "Elegiste retiro en el local. También realizamos envíos en moto y coordinamos envíos al interior."
+        : shippingMethod === "MOTO"
+        ? `Elegiste envío en moto${motoLocality ? ` a ${motoLocality}` : ""}. También podés retirar en el local o coordinar envíos al interior.`
+        : "Elegiste coordinar envío al interior. También podés retirar en el local o solicitar envío en moto según la zona."}
+    </p>
+  </div>
+</div>
 
               <div className="flex items-start gap-3 p-3 rounded-xl bg-green-50 border border-green-100">
                 <CreditCard className="w-5 h-5 text-green-500 mt-0.5" />
@@ -1551,6 +1552,7 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                     {paymentMethod === "CASH" && "Pago en efectivo al retirar."}
                     {paymentMethod === "TRANSFER" && "Transferencia bancaria sin recargos."}
                     {paymentMethod === "COORDINATE" && "Coordinaremos el pago vía WhatsApp."}
+                    {paymentMethod === "MERCADO_PAGO" && "Pago con Mercado Pago con 5% de recargo."}
                   </p>
                 </div>
               </div>

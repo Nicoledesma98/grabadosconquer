@@ -8,7 +8,7 @@ import { getMotoFromLocality, MotoZone } from "@/lib/shipping/moto";
 export const runtime = "nodejs";
 
 const VAT_RATE = 21;      // %
-const MP_RATE = 0.10;     // 10%
+const MP_RATE = 0.05;     // 10%
 
 // Función para sanitizar strings
 function sanitizeString(str: string, maxLength: number = 255): string {
@@ -335,7 +335,7 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
     // -------------------------
    const paymentMethod = String(body.paymentMethod ?? "CASH");
 
-if (!["CASH", "TRANSFER", "COORDINATE"].includes(paymentMethod)) {
+if (!["CASH", "TRANSFER", "COORDINATE","MERCADO_PAGO"].includes(paymentMethod)) {
   return Response.json(
     { error: "Método de pago inválido", field: "paymentMethod" },
     { status: 400 }
@@ -364,9 +364,14 @@ if (paymentMethod === "CASH" && shippingMethod !== "PICKUP") {
     const vatRate = VAT_RATE;
     const vatAmount = Math.round(subtotalNet * vatRate / 100);
 
-    const baseTotal = subtotalNet + vatAmount + shipping;
-    const paymentSurcharge = 0;
-    const total = baseTotal + paymentSurcharge;
+const baseTotal = subtotalNet + vatAmount + shipping;
+
+const paymentSurcharge =
+  paymentMethod === "MERCADO_PAGO"
+    ? Math.round(baseTotal * MP_RATE)
+    : 0;
+
+const total = baseTotal + paymentSurcharge;
         // -------------------------
     // Validar stock real antes de crear pedido
     // -------------------------
