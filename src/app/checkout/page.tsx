@@ -69,7 +69,7 @@ export default function CheckoutPage() {
   const items = useCart((s) => s.items);
   const subtotalNet = useCart((s) => s.subtotal());
   const clear = useCart((s) => s.clear);
-
+  const enableMercadoPago = process.env.NEXT_PUBLIC_ENABLE_MERCADO_PAGO === "true";
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
@@ -1364,6 +1364,7 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                         </div>
                       </div>
                     </label>
+                    {enableMercadoPago && (
                     <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
   paymentMethod === "MERCADO_PAGO" 
     ? "border-conquer-orange bg-conquer-orange/5" 
@@ -1383,7 +1384,7 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
     </div>
   </div>
 </label>
-
+                    )}
                     <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
                       paymentMethod === "COORDINATE" 
                         ? "border-conquer-orange bg-conquer-orange/5" 
