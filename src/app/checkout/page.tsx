@@ -3,14 +3,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCart } from "@/store/cart";
 import { useRouter } from "next/navigation";
-import { MOTO_PRICES, MotoZone, getMotoLocalitiesByZone, getMotoFromLocality } from "@/lib/shipping/moto";
-import { 
-  AlertCircle, 
-  CheckCircle, 
-  Upload, 
-  FileText, 
-  Truck, 
-  CreditCard, 
+import {
+  MOTO_PRICES,
+  MotoZone,
+  getMotoLocalitiesByZone,
+  getMotoFromLocality,
+} from "@/lib/shipping/moto";
+import {
+  AlertCircle,
+  CheckCircle,
+  Upload,
+  FileText,
+  Truck,
+  CreditCard,
   Wallet,
   MessageCircle,
   User,
@@ -28,8 +33,10 @@ import {
   Edit3,
   Send,
   ChevronRight,
-  MapPin as MapPinIcon
+  MapPin as MapPinIcon,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
+
 
 function formatARS(value: number) {
   return new Intl.NumberFormat("es-AR", {
@@ -42,9 +49,9 @@ function formatARS(value: number) {
 const VAT_RATE = 0.21;
 
 type ShippingMethod = "PICKUP" | "MOTO" | "OCA" | "COORDINATE_INTERIOR";
-type PaymentMethod =   "CASH" | "TRANSFER" | "COORDINATE" | "MERCADO_PAGO";
+type PaymentMethod = "CASH" | "TRANSFER" | "COORDINATE" | "MERCADO_PAGO";
 type InvoiceType = "CONSUMIDOR_FINAL" | "IVA_EXENTO" | "RESPONSABLE_INSCRIPTO";
-
+type CheckoutPageProps = { forceEnableMercadoPago ?:boolean};
 interface ValidationErrors {
   name?: string;
   email?: string;
@@ -64,17 +71,18 @@ interface ValidationErrors {
   general?: string;
 }
 
-export default function CheckoutPage() {
+export default function CheckoutPage({ forceEnableMercadoPago = false,}: CheckoutPageProps) {
   const router = useRouter();
   const items = useCart((s) => s.items);
   const subtotalNet = useCart((s) => s.subtotal());
   const clear = useCart((s) => s.clear);
-  const enableMercadoPago = process.env.NEXT_PUBLIC_ENABLE_MERCADO_PAGO === "true";
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
+    {},
+  );
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const [submitError, setSubmitError] = useState<string | null>(null);
-
+  const enableMercadoPago = forceEnableMercadoPago || process.env.NEXT_PUBLIC_ENABLE_MERCADO_PAGO === "true";
   // Personalización
   const [customText, setCustomText] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -87,7 +95,8 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState("");
 
   // Envío
-  const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("PICKUP");
+  const [shippingMethod, setShippingMethod] =
+    useState<ShippingMethod>("PICKUP");
   const [motoZone, setMotoZone] = useState<MotoZone>("CABA");
   const [motoLocality, setMotoLocality] = useState<string>("");
   const motoData = useMemo(() => getMotoLocalitiesByZone(), []);
@@ -97,7 +106,8 @@ export default function CheckoutPage() {
   const [shipApartment, setShipApartment] = useState("");
 
   // Factura
-  const [invoiceType, setInvoiceType] = useState<InvoiceType>("CONSUMIDOR_FINAL");
+  const [invoiceType, setInvoiceType] =
+    useState<InvoiceType>("CONSUMIDOR_FINAL");
   const [invoiceCuit, setInvoiceCuit] = useState("");
   const [invoiceBusinessName, setInvoiceBusinessName] = useState("");
   const [invoiceAddress, setInvoiceAddress] = useState("");
@@ -107,38 +117,41 @@ export default function CheckoutPage() {
   const needsAddress = shippingMethod !== "PICKUP";
   // Pago
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
-  
+
   useEffect(() => {
     if (shippingMethod !== "PICKUP" && paymentMethod === "CASH") {
       setPaymentMethod("TRANSFER");
     }
   }, [shippingMethod, paymentMethod]);
   useEffect(() => {
-  if (!needsAddress && useShippingForInvoice) {
-    setUseShippingForInvoice(false);
-  }
-}, [needsAddress, useShippingForInvoice]);
+    if (!needsAddress && useShippingForInvoice) {
+      setUseShippingForInvoice(false);
+    }
+  }, [needsAddress, useShippingForInvoice]);
 
   useEffect(() => {
-  if (!useShippingForInvoice) return;
+    if (!useShippingForInvoice) return;
 
-  const fullAddress = [shipStreet, shipNumber].filter(Boolean).join(" ").trim();
-  setInvoiceAddress(fullAddress);
-  setInvoicePostalCode(shipPostalCode);
+    const fullAddress = [shipStreet, shipNumber]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    setInvoiceAddress(fullAddress);
+    setInvoicePostalCode(shipPostalCode);
 
-  if (shippingMethod === "MOTO") {
-    setInvoiceCity(motoLocality);
-  } else {
-    setInvoiceCity("");
-  }
-}, [
-  useShippingForInvoice,
-  shipStreet,
-  shipNumber,
-  shipPostalCode,
-  motoLocality,
-  shippingMethod,
-]);
+    if (shippingMethod === "MOTO") {
+      setInvoiceCity(motoLocality);
+    } else {
+      setInvoiceCity("");
+    }
+  }, [
+    useShippingForInvoice,
+    shipStreet,
+    shipNumber,
+    shipPostalCode,
+    motoLocality,
+    shippingMethod,
+  ]);
 
   const [loading, setLoading] = useState(false);
 
@@ -152,9 +165,9 @@ export default function CheckoutPage() {
     // Permite formatos: 30-12345678-9 o 30123456789
     const cuitRegex = /^(\d{2}-\d{8}-\d{1}|\d{11})$/;
     if (!cuitRegex.test(cuit)) return false;
-    
+
     // Limpiamos guiones para validación básica
-    const cleanedCuit = cuit.replace(/\D/g, '');
+    const cleanedCuit = cuit.replace(/\D/g, "");
     return cleanedCuit.length === 11;
   };
 
@@ -166,41 +179,44 @@ export default function CheckoutPage() {
 
   const isValidPostalCode = (postalCode: string): boolean => {
     const postalCodeRegex = /^\d{4,8}$/;
-    return postalCodeRegex.test(postalCode.replace(/\D/g, ''));
+    return postalCodeRegex.test(postalCode.replace(/\D/g, ""));
   };
 
   const validateFile = (file: File | null): string | null => {
     if (!file) return null;
-    
+
     const validTypes = [
-      'image/jpeg', 
-      'image/png', 
-      'image/gif', 
-      'image/webp',
-      'application/pdf', 
-      'application/msword', 
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
     const maxSize = 10 * 1024 * 1024; // 10MB
-    
+
     if (!validTypes.includes(file.type)) {
       return "Tipo de archivo no válido. Solo se permiten imágenes, PDF y Word.";
     }
-    
+
     if (file.size > maxSize) {
       return `El archivo es demasiado grande (${(file.size / 1024 / 1024).toFixed(2)}MB). Máximo 10MB.`;
     }
-    
+
     return null;
   };
 
-  const handleFieldChange = (field: string, value: string, setter: (value: string) => void) => {
+  const handleFieldChange = (
+    field: string,
+    value: string,
+    setter: (value: string) => void,
+  ) => {
     setter(value);
-    setTouchedFields(prev => new Set(prev).add(field));
-    
+    setTouchedFields((prev) => new Set(prev).add(field));
+
     if (validationErrors[field as keyof ValidationErrors]) {
-      
-      setValidationErrors(prev => ({ ...prev, [field]: undefined }));
+      setValidationErrors((prev) => ({ ...prev, [field]: undefined }));
     }
     if (submitError) setSubmitError(null);
   };
@@ -211,21 +227,21 @@ export default function CheckoutPage() {
 
   const validateStep2 = (): boolean => {
     const errors: ValidationErrors = {};
-    
+
     if (file) {
       const fileError = validateFile(file);
       if (fileError) {
         errors.file = fileError;
       }
     }
-    
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const validateStep3 = (): boolean => {
     const errors: ValidationErrors = {};
-    
+
     if (!name.trim()) {
       errors.name = "El nombre es requerido";
     } else if (name.trim().length < 2) {
@@ -233,36 +249,36 @@ export default function CheckoutPage() {
     } else if (name.trim().length > 100) {
       errors.name = "El nombre es demasiado largo";
     }
-    
+
     if (!email.trim()) {
       errors.email = "El email es requerido";
     } else if (!isValidEmail(email.trim())) {
       errors.email = "Ingrese un email válido (ej: nombre@dominio.com)";
     }
-    
+
     if (phone.trim() && !isValidPhone(phone.trim())) {
       errors.phone = "Ingrese un teléfono válido (ej: 11 1234-5678)";
     }
-    
+
     if (shippingMethod !== "PICKUP") {
       if (!shipStreet.trim()) {
         errors.shipStreet = "La calle es requerida";
       } else if (shipStreet.trim().length > 200) {
         errors.shipStreet = "La calle es demasiado larga";
       }
-      
+
       if (!shipNumber.trim()) {
         errors.shipNumber = "El número es requerido";
       } else if (shipNumber.trim().length > 20) {
         errors.shipNumber = "El número es demasiado largo";
       }
-      
+
       if (!shipPostalCode.trim()) {
         errors.shipPostalCode = "El código postal es requerido";
       } else if (!isValidPostalCode(shipPostalCode)) {
         errors.shipPostalCode = "Ingrese un código postal válido (4-8 dígitos)";
       }
-      
+
       if (shippingMethod === "MOTO") {
         if (!motoLocality.trim()) {
           errors.motoLocality = "Debe seleccionar una localidad";
@@ -274,41 +290,46 @@ export default function CheckoutPage() {
         }
       }
     }
-      
+
     if (!invoiceAddress.trim()) {
-  errors.invoiceAddress = "La dirección de facturación es requerida";
-} else if (invoiceAddress.trim().length > 200) {
-  errors.invoiceAddress = "La dirección es demasiado larga";
-}
+      errors.invoiceAddress = "La dirección de facturación es requerida";
+    } else if (invoiceAddress.trim().length > 200) {
+      errors.invoiceAddress = "La dirección es demasiado larga";
+    }
 
-if (!invoiceCity.trim()) {
-  errors.invoiceCity = "La localidad de facturación es requerida";
-} else if (invoiceCity.trim().length > 100) {
-  errors.invoiceCity = "La localidad es demasiado larga";
-}
+    if (!invoiceCity.trim()) {
+      errors.invoiceCity = "La localidad de facturación es requerida";
+    } else if (invoiceCity.trim().length > 100) {
+      errors.invoiceCity = "La localidad es demasiado larga";
+    }
 
-if (!invoicePostalCode.trim()) {
-  errors.invoicePostalCode = "El código postal de facturación es requerido";
-} else if (!isValidPostalCode(invoicePostalCode)) {
-  errors.invoicePostalCode = "Ingrese un código postal válido";
-}
+    if (!invoicePostalCode.trim()) {
+      errors.invoicePostalCode = "El código postal de facturación es requerido";
+    } else if (!isValidPostalCode(invoicePostalCode)) {
+      errors.invoicePostalCode = "Ingrese un código postal válido";
+    }
 
-if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
-  if (!invoiceCuit.trim()) {
-    errors.invoiceCuit = "El CUIT es requerido";
-  } else if (!isValidCUIT(invoiceCuit.trim())) {
-    errors.invoiceCuit = "Formato de CUIT inválido (ej: 30-12345678-9 o 30123456789)";
-  }
+    if (
+      invoiceType === "IVA_EXENTO" ||
+      invoiceType === "RESPONSABLE_INSCRIPTO"
+    ) {
+      if (!invoiceCuit.trim()) {
+        errors.invoiceCuit = "El CUIT es requerido";
+      } else if (!isValidCUIT(invoiceCuit.trim())) {
+        errors.invoiceCuit =
+          "Formato de CUIT inválido (ej: 30-12345678-9 o 30123456789)";
+      }
 
-  if (!invoiceBusinessName.trim()) {
-    errors.invoiceBusinessName = "La razón social es requerida";
-  } else if (invoiceBusinessName.trim().length < 3) {
-    errors.invoiceBusinessName = "Ingrese una razón social válida (mínimo 3 caracteres)";
-  } else if (invoiceBusinessName.trim().length > 200) {
-    errors.invoiceBusinessName = "La razón social es demasiado larga";
-  }
-}
-    
+      if (!invoiceBusinessName.trim()) {
+        errors.invoiceBusinessName = "La razón social es requerida";
+      } else if (invoiceBusinessName.trim().length < 3) {
+        errors.invoiceBusinessName =
+          "Ingrese una razón social válida (mínimo 3 caracteres)";
+      } else if (invoiceBusinessName.trim().length > 200) {
+        errors.invoiceBusinessName = "La razón social es demasiado larga";
+      }
+    }
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -322,35 +343,34 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
   };
 
   const handlePrevStep = () => {
-    setStep(prev => Math.max(1, prev - 1) as 1 | 2 | 3);
+    setStep((prev) => Math.max(1, prev - 1) as 1 | 2 | 3);
     setValidationErrors({});
     setSubmitError(null);
   };
 
   // Calcular totales
-  const vatAmount = useMemo(() => Math.round(subtotalNet * VAT_RATE), [subtotalNet]);
+  const vatAmount = useMemo(
+    () => Math.round(subtotalNet * VAT_RATE),
+    [subtotalNet],
+  );
 
   const shipping = useMemo(() => {
     if (shippingMethod === "PICKUP") return 0;
-    if (shippingMethod === "MOTO") return motoLocality ? MOTO_PRICES[motoZone] : 0;
+    if (shippingMethod === "MOTO")
+      return motoLocality ? MOTO_PRICES[motoZone] : 0;
     return 0;
   }, [shippingMethod, motoZone, motoLocality]);
 
   const baseTotal = subtotalNet + vatAmount + shipping;
 
   const surcharge = useMemo(() => {
-  return paymentMethod === "MERCADO_PAGO"
-    ? Math.round(baseTotal * 0.05)
-    : 0;
-}, [paymentMethod, baseTotal]); ///recordar que cobramos el 10 % de mas cuando es con mercado pago
+    return paymentMethod === "MERCADO_PAGO" ? Math.round(baseTotal * 0.05) : 0;
+  }, [paymentMethod, baseTotal]); ///recordar que cobramos el 10 % de mas cuando es con mercado pago
 
   const total = baseTotal + surcharge;
 
   const MIN_PURCHASE = 90000;
   const meetsMinimum = total >= MIN_PURCHASE;
-
-
-  
 
   const getFieldError = (field: keyof ValidationErrors): string | null => {
     if (validationErrors[field] && touchedFields.has(field)) {
@@ -360,9 +380,10 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
   };
 
   const getFieldClassName = (field: keyof ValidationErrors): string => {
-    const baseClass = "h-11 rounded-2xl border px-4 w-full transition-all focus:outline-none focus:ring-2";
-    const errorClass = getFieldError(field) 
-      ? "border-red-500 focus:border-red-500 focus:ring-red-200" 
+    const baseClass =
+      "h-11 rounded-2xl border px-4 w-full transition-all focus:outline-none focus:ring-2";
+    const errorClass = getFieldError(field)
+      ? "border-red-500 focus:border-red-500 focus:ring-red-200"
       : "border-conquer-pink focus:border-conquer-orange focus:ring-conquer-orange/30";
     return `${baseClass} ${errorClass}`;
   };
@@ -370,33 +391,37 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
   async function createOrder() {
     if (!validateStep3()) {
       const allFields = [
-        'name', 
-        'email', 
-        'phone', 
-        'shipStreet', 
-        'shipNumber', 
-        'shipPostalCode', 
-        'motoLocality', 
-        'invoiceCuit', 
-        'invoiceBusinessName',
-        'invoiceAddress',
-        'invoiceCity',
-        'invoicePostalCode',
+        "name",
+        "email",
+        "phone",
+        "shipStreet",
+        "shipNumber",
+        "shipPostalCode",
+        "motoLocality",
+        "invoiceCuit",
+        "invoiceBusinessName",
+        "invoiceAddress",
+        "invoiceCity",
+        "invoicePostalCode",
       ];
-      setTouchedFields(prev => new Set([...prev, ...allFields]));
+      setTouchedFields((prev) => new Set([...prev, ...allFields]));
       return;
     }
 
     setLoading(true);
     setSubmitError(null);
-    
+
     try {
-      let uploaded: { url: string; originalName: string; mimeType: string } | null = null;
+      let uploaded: {
+        url: string;
+        originalName: string;
+        mimeType: string;
+      } | null = null;
 
       if (file) {
         const fileError = validateFile(file);
         if (fileError) {
-          setValidationErrors(prev => ({ ...prev, file: fileError }));
+          setValidationErrors((prev) => ({ ...prev, file: fileError }));
           setLoading(false);
           return;
         }
@@ -405,32 +430,38 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
           const fd = new FormData();
           fd.append("file", file);
 
-          const up = await fetch("/api/upload", { 
-            method: "POST", 
+          const up = await fetch("/api/upload", {
+            method: "POST",
             body: fd,
             headers: {
-              'Accept': 'application/json',
-            }
+              Accept: "application/json",
+            },
           });
-          
+
           if (!up.ok) {
-            const errorData = await up.json().catch(() => ({ error: "Error desconocido en la subida" }));
-            throw new Error(errorData.error || `Error ${up.status} en la subida`);
+            const errorData = await up
+              .json()
+              .catch(() => ({ error: "Error desconocido en la subida" }));
+            throw new Error(
+              errorData.error || `Error ${up.status} en la subida`,
+            );
           }
 
-          const data = await up.json() as { 
-            url: string; 
-            originalName: string; 
+          const data = (await up.json()) as {
+            url: string;
+            originalName: string;
             mimeType: string;
             error?: string;
           };
-          
+
           if (data.error) {
             throw new Error(data.error);
           }
 
-          if (!data.url || typeof data.url !== 'string') {
-            throw new Error("La respuesta del servidor no contiene una URL válida");
+          if (!data.url || typeof data.url !== "string") {
+            throw new Error(
+              "La respuesta del servidor no contiene una URL válida",
+            );
           }
 
           // Validar que la URL sea válida
@@ -438,7 +469,7 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
             new URL(data.url);
           } catch {
             // Si es una URL relativa, la convertimos a absoluta
-            if (!data.url.startsWith('/')) {
+            if (!data.url.startsWith("/")) {
               throw new Error("URL de archivo inválida");
             }
           }
@@ -464,10 +495,10 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
         motoZone: shippingMethod === "MOTO" ? motoZone : null,
         customText: customText.trim() || null,
         upload: uploaded
-          ? { 
-              url: uploaded.url, 
-              originalName: uploaded.originalName, 
-              mimeType: uploaded.mimeType 
+          ? {
+              url: uploaded.url,
+              originalName: uploaded.originalName,
+              mimeType: uploaded.mimeType,
             }
           : null,
 
@@ -479,11 +510,13 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
         shipApartment: needsAddress ? shipApartment.trim() : null,
 
         invoiceType,
-invoiceCuit: invoiceCuit.trim() ? invoiceCuit.replace(/\D/g, "") : null,
-invoiceBusinessName: invoiceBusinessName.trim() ? invoiceBusinessName.trim() : null,
-invoiceAddress: invoiceAddress.trim(),
-invoiceCity: invoiceCity.trim(),
-invoicePostalCode: invoicePostalCode.trim(),
+        invoiceCuit: invoiceCuit.trim() ? invoiceCuit.replace(/\D/g, "") : null,
+        invoiceBusinessName: invoiceBusinessName.trim()
+          ? invoiceBusinessName.trim()
+          : null,
+        invoiceAddress: invoiceAddress.trim(),
+        invoiceCity: invoiceCity.trim(),
+        invoicePostalCode: invoicePostalCode.trim(),
 
         paymentMethod,
 
@@ -508,30 +541,36 @@ invoicePostalCode: invoicePostalCode.trim(),
 
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json"
+          Accept: "application/json",
         },
         body: JSON.stringify(checkoutData),
       });
 
       const responseText = await res.text();
       let responseData;
-      
+
       try {
         responseData = JSON.parse(responseText);
       } catch {
-        throw new Error(`Respuesta inválida del servidor: ${responseText.substring(0, 100)}`);
+        throw new Error(
+          `Respuesta inválida del servidor: ${responseText.substring(0, 100)}`,
+        );
       }
 
       if (!res.ok) {
         console.error("Error response from server:", responseData);
-        throw new Error(responseData?.error || responseData?.message || `Error ${res.status}: ${res.statusText}`);
+        throw new Error(
+          responseData?.error ||
+            responseData?.message ||
+            `Error ${res.status}: ${res.statusText}`,
+        );
       }
-      
-      const data = responseData as { 
-        orderId: string; 
-        paymentMethod: PaymentMethod; 
+
+      const data = responseData as {
+        orderId: string;
+        paymentMethod: PaymentMethod;
         total: number;
         success: boolean;
         error?: string;
@@ -544,38 +583,41 @@ invoicePostalCode: invoicePostalCode.trim(),
       if (!data.orderId) {
         throw new Error("No se recibió un ID de pedido válido del servidor");
       }
-      
+
       clear();
       // Después de clear(), justo antes de los ifs de paymentMethod
-if (paymentMethod === "MERCADO_PAGO") {
-  // Crear preferencia de Mercado Pago
-  const prefRes = await fetch("/api/create-preference", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    orderId: data.orderId,
-  }),
-});
+      if (paymentMethod === "MERCADO_PAGO") {
+        // Crear preferencia de Mercado Pago
+        const prefRes = await fetch("/api/create-preference", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: data.orderId,
+          }),
+        });
 
-const prefData = await prefRes.json();
-if (!prefRes.ok) {
-  throw new Error(prefData.error || 'Error al crear la preferencia de pago');
- }
+        const prefData = await prefRes.json();
+        if (!prefRes.ok) {
+          throw new Error(
+            prefData.error || "Error al crear la preferencia de pago",
+          );
+        }
 
-  // Redirigir al checkout de Mercado Pago
-window.location.href = prefData.sandbox_init_point || prefData.init_point; //`https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=${prefData.id}`;
-return; // Importante: salir de la función para que no continúe
-}
+        // Redirigir al checkout de Mercado Pago
+        window.location.href =
+          prefData.sandbox_init_point || prefData.init_point; //`https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=${prefData.id}`;
+        return; // Importante: salir de la función para que no continúe
+      }
 
       if (paymentMethod === "COORDINATE") {
         const msg = encodeURIComponent(
           `¡Hola! Realicé una compra.\n` +
-          `• Pedido: ${data.orderId}\n` +
-          `• Nombre: ${name}\n` +
-          `• Tel: ${phone || "No especificado"}\n` +
-          `• Email: ${email}\n` +
-          `• Envío: ${shippingMethod === "PICKUP" ? "Retiro" : shippingMethod === "MOTO" ? `Moto (${motoZone})` : shippingMethod}\n` +
-          `• Total: ${formatARS(total)}`
+            `• Pedido: ${data.orderId}\n` +
+            `• Nombre: ${name}\n` +
+            `• Tel: ${phone || "No especificado"}\n` +
+            `• Email: ${email}\n` +
+            `• Envío: ${shippingMethod === "PICKUP" ? "Retiro" : shippingMethod === "MOTO" ? `Moto (${motoZone})` : shippingMethod}\n` +
+            `• Total: ${formatARS(total)}`,
         );
         window.location.href = `https://wa.me/541170660569?text=${msg}`;
         return;
@@ -587,17 +629,23 @@ return; // Importante: salir de la función para que no continúe
       }
 
       router.push(`/gracias/${data.orderId}`);
-      
     } catch (error: any) {
       console.error("Error completo en createOrder:", error);
-      
-      const errorMessage = error.message || "No se pudo crear el pedido. Por favor, intente nuevamente.";
+
+      const errorMessage =
+        error.message ||
+        "No se pudo crear el pedido. Por favor, intente nuevamente.";
       setSubmitError(errorMessage);
-      
+
       // No mostrar alert para errores de validación que ya mostramos
-      if (!error.message.includes("validación") && !error.message.includes("validar")) {
+      if (
+        !error.message.includes("validación") &&
+        !error.message.includes("validar")
+      ) {
         setTimeout(() => {
-          alert(`Error: ${errorMessage}\n\nSi el problema persiste, por favor contacte a soporte.`);
+          alert(
+            `Error: ${errorMessage}\n\nSi el problema persiste, por favor contacte a soporte.`,
+          );
         }, 100);
       }
     } finally {
@@ -607,31 +655,40 @@ return; // Importante: salir de la función para que no continúe
 
   const disabledStep1 = useMemo(() => items.length === 0, [items.length]);
   const disabledStep2 = useMemo(() => items.length === 0, [items.length]);
-  
+
   const disabledStep3 = useMemo(() => {
     if (loading || items.length === 0) return true;
-    
+
     if (!name.trim() || !email.trim()) return true;
-    
+
     if (!isValidEmail(email.trim())) return true;
-    
+
     if (needsAddress) {
-      if (!shipStreet.trim() || !shipNumber.trim() || !shipPostalCode.trim()) return true;
-      
+      if (!shipStreet.trim() || !shipNumber.trim() || !shipPostalCode.trim())
+        return true;
+
       if (shippingMethod === "MOTO") {
         const ok = getMotoFromLocality(motoZone, motoLocality);
         if (!motoLocality.trim() || !ok) return true;
       }
     }
-    
-    if (!invoiceAddress.trim() || !invoiceCity.trim() || !invoicePostalCode.trim()) return true;
-if (!isValidPostalCode(invoicePostalCode)) return true;
 
-if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
-  if (!invoiceCuit.trim() || !invoiceBusinessName.trim()) return true;
-  if (!isValidCUIT(invoiceCuit.trim())) return true;
-}
-    
+    if (
+      !invoiceAddress.trim() ||
+      !invoiceCity.trim() ||
+      !invoicePostalCode.trim()
+    )
+      return true;
+    if (!isValidPostalCode(invoicePostalCode)) return true;
+
+    if (
+      invoiceType === "IVA_EXENTO" ||
+      invoiceType === "RESPONSABLE_INSCRIPTO"
+    ) {
+      if (!invoiceCuit.trim() || !invoiceBusinessName.trim()) return true;
+      if (!isValidCUIT(invoiceCuit.trim())) return true;
+    }
+
     return false;
   }, [
     loading,
@@ -652,7 +709,6 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
     invoiceCity,
     invoicePostalCode,
   ]);
-
   // Renderizado del componente (igual que antes, pero con corrección del error de Phone)
   return (
     <main className="p-4 md:p-6 max-w-6xl mx-auto">
@@ -660,13 +716,17 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
         <ShoppingCart className="w-7 h-7 text-conquer-orange" />
         Checkout
       </h1>
-      <p className="text-gray-600 mb-6">Completa los datos para finalizar tu compra</p>
+      <p className="text-gray-600 mb-6">
+        Completa los datos para finalizar tu compra
+      </p>
 
       {items.length === 0 ? (
         <div className="mt-6 rounded-3xl border border-conquer-pink p-8 text-center text-neutral-600 bg-white">
           <Package className="w-16 h-16 mx-auto text-gray-300 mb-4" />
           <p className="text-lg font-medium mb-2">Tu carrito está vacío</p>
-          <p className="text-sm text-gray-500 mb-4">Agrega productos para continuar con la compra</p>
+          <p className="text-sm text-gray-500 mb-4">
+            Agrega productos para continuar con la compra
+          </p>
           <button
             onClick={() => router.push("/")}
             className="px-6 py-3 rounded-2xl bg-conquer-orange text-white font-medium hover:opacity-90"
@@ -680,59 +740,73 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
           <div className="rounded-3xl border border-conquer-pink bg-white p-5 md:p-6">
             {/* Stepper */}
             <div className="flex items-center gap-2 mb-6">
-  {[1, 2, 3].map((n) => {
-    const stepLabel =
-      n === 1 ? "Productos" : n === 2 ? "Personalización" : "Envío y pago";
+              {[1, 2, 3].map((n) => {
+                const stepLabel =
+                  n === 1
+                    ? "Productos"
+                    : n === 2
+                      ? "Personalización"
+                      : "Envío y pago";
 
-    return (
-      <button
-        key={n}
-        type="button"
-        onClick={() => {
-          if (n === 1) setStep(1);
-          if (n === 2 && validateStep1()) setStep(2);
-          if (n === 3 && validateStep1() && validateStep2()) setStep(3);
-        }}
-        className={`flex items-center gap-2 h-10 px-4 rounded-2xl border transition-all ${
-          step === n
-            ? "bg-conquer-orange text-white border-conquer-orange shadow-md"
-            : step > n
-            ? "bg-conquer-pink/10 text-conquer-navy border-conquer-pink"
-            : "border-conquer-pink text-gray-500 hover:bg-conquer-pink/5"
-        }`}
-      >
-        {n === 1 && <ShoppingCart className="w-4 h-4" />}
-        {n === 2 && <Edit3 className="w-4 h-4" />}
-        {n === 3 && <Send className="w-4 h-4" />}
-        <span className="text-sm font-medium">{stepLabel}</span>
-      </button>
-    );
-  })}
-</div>
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => {
+                      if (n === 1) setStep(1);
+                      if (n === 2 && validateStep1()) setStep(2);
+                      if (n === 3 && validateStep1() && validateStep2())
+                        setStep(3);
+                    }}
+                    className={`flex items-center gap-2 h-10 px-4 rounded-2xl border transition-all ${
+                      step === n
+                        ? "bg-conquer-orange text-white border-conquer-orange shadow-md"
+                        : step > n
+                          ? "bg-conquer-pink/10 text-conquer-navy border-conquer-pink"
+                          : "border-conquer-pink text-gray-500 hover:bg-conquer-pink/5"
+                    }`}
+                  >
+                    {n === 1 && <ShoppingCart className="w-4 h-4" />}
+                    {n === 2 && <Edit3 className="w-4 h-4" />}
+                    {n === 3 && <Send className="w-4 h-4" />}
+                    <span className="text-sm font-medium">{stepLabel}</span>
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Paso 1 */}
             {step === 1 && (
               <div className="mt-2">
                 <div className="flex items-center gap-2 mb-4">
                   <ShoppingCart className="w-5 h-5 text-conquer-orange" />
-                  <h2 className="text-lg font-bold text-conquer-navy">1) Productos Seleccionados</h2>
+                  <h2 className="text-lg font-bold text-conquer-navy">
+                    1) Productos Seleccionados
+                  </h2>
                 </div>
 
                 <div className="mt-4 space-y-3">
                   {items.map((i) => (
                     <div
-                      key={(i as any).key ?? `${i.productId}-${(i as any).variantId ?? ""}-${(i as any).method ?? ""}`}
+                      key={
+                        (i as any).key ??
+                        `${i.productId}-${(i as any).variantId ?? ""}-${(i as any).method ?? ""}`
+                      }
                       className="flex items-start justify-between gap-3 rounded-2xl border border-conquer-pink p-4 hover:border-conquer-orange/50 transition-colors"
                     >
                       <div className="flex-1">
-                        <div className="font-semibold text-conquer-navy">{i.name}</div>
+                        <div className="font-semibold text-conquer-navy">
+                          {i.name}
+                        </div>
                         {(i as any).variantName && (
                           <div className="mt-1 text-xs text-gray-600 flex items-center gap-2">
-                            <span>Color: <b>{(i as any).variantName}</b></span>
+                            <span>
+                              Color: <b>{(i as any).variantName}</b>
+                            </span>
                             {(i as any).colorHex && (
-                              <span 
-                                className="h-3 w-3 rounded-full border border-gray-300" 
-                                style={{ backgroundColor: (i as any).colorHex }} 
+                              <span
+                                className="h-3 w-3 rounded-full border border-gray-300"
+                                style={{ backgroundColor: (i as any).colorHex }}
                               />
                             )}
                           </div>
@@ -743,7 +817,8 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                           </div>
                         )}
                         <div className="mt-2 text-sm text-gray-700">
-                          {i.qty} × {formatARS(i.unitPrice)} <span className="text-xs text-gray-500">+ IVA</span>
+                          {i.qty} × {formatARS(i.unitPrice)}{" "}
+                          <span className="text-xs text-gray-500">+ IVA</span>
                         </div>
                       </div>
                       <div className="font-bold text-conquer-navy">
@@ -785,14 +860,18 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
               <div className="mt-2">
                 <div className="flex items-center gap-2 mb-4">
                   <Edit3 className="w-5 h-5 text-conquer-orange" />
-                  <h2 className="text-lg font-bold text-conquer-navy">2) Personalización</h2>
+                  <h2 className="text-lg font-bold text-conquer-navy">
+                    2) Personalización
+                  </h2>
                 </div>
 
                 <div className="mt-4 space-y-5">
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <Upload className="w-5 h-5 text-conquer-navy" />
-                      <label className="text-sm font-medium text-conquer-navy">Subir archivo (opcional)</label>
+                      <label className="text-sm font-medium text-conquer-navy">
+                        Subir archivo (opcional)
+                      </label>
                     </div>
                     <div className="relative">
                       <input
@@ -803,14 +882,20 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                           if (f) {
                             const fileError = validateFile(f);
                             if (fileError) {
-                              setValidationErrors(prev => ({ ...prev, file: fileError }));
+                              setValidationErrors((prev) => ({
+                                ...prev,
+                                file: fileError,
+                              }));
                               return;
                             }
                           }
                           setFile(f);
                           setFileUrl(null);
                           setFileName(null);
-                          setValidationErrors(prev => ({ ...prev, file: undefined }));
+                          setValidationErrors((prev) => ({
+                            ...prev,
+                            file: undefined,
+                          }));
                         }}
                         className="w-full rounded-2xl border border-conquer-pink p-3 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-conquer-pink/20 file:text-conquer-navy hover:file:bg-conquer-pink/30"
                       />
@@ -835,7 +920,9 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <FileText className="w-5 h-5 text-conquer-navy" />
-                      <label className="text-sm font-medium text-conquer-navy">Texto personalizado (opcional)</label>
+                      <label className="text-sm font-medium text-conquer-navy">
+                        Texto personalizado (opcional)
+                      </label>
                     </div>
                     <textarea
                       className="min-h-32 rounded-2xl border border-conquer-pink px-4 py-3 w-full focus:border-conquer-orange focus:ring-1 focus:ring-conquer-orange focus:outline-none"
@@ -882,7 +969,9 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
               <div className="mt-2">
                 <div className="flex items-center gap-2 mb-4">
                   <Send className="w-5 h-5 text-conquer-orange" />
-                  <h2 className="text-lg font-bold text-conquer-navy">3) Envío · Datos · Pago</h2>
+                  <h2 className="text-lg font-bold text-conquer-navy">
+                    3) Envío · Datos · Pago
+                  </h2>
                 </div>
 
                 {/* Mostrar error general si existe */}
@@ -894,7 +983,8 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                     </div>
                     <p className="text-red-500 text-sm">{submitError}</p>
                     <p className="text-red-400 text-xs mt-2">
-                      Por favor, verifica los datos e intenta nuevamente. Si el problema persiste, contacta a soporte.
+                      Por favor, verifica los datos e intenta nuevamente. Si el
+                      problema persiste, contacta a soporte.
                     </p>
                   </div>
                 )}
@@ -903,16 +993,24 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                 <div className="mb-6 rounded-2xl border border-conquer-pink p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <Truck className="w-5 h-5 text-conquer-navy" />
-                    <h3 className="text-base font-semibold text-conquer-navy">Método de envío</h3>
+                    <h3 className="text-base font-semibold text-conquer-navy">
+                      Método de envío
+                    </h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {(["PICKUP", "MOTO", "COORDINATE_INTERIOR"] as ShippingMethod[]).map((m) => (
-                      <label 
-                        key={m} 
+                    {(
+                      [
+                        "PICKUP",
+                        "MOTO",
+                        "COORDINATE_INTERIOR",
+                      ] as ShippingMethod[]
+                    ).map((m) => (
+                      <label
+                        key={m}
                         className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
-                          shippingMethod === m 
-                            ? "border-conquer-orange bg-conquer-orange/5" 
+                          shippingMethod === m
+                            ? "border-conquer-orange bg-conquer-orange/5"
                             : "border-conquer-pink hover:border-conquer-orange/50"
                         }`}
                       >
@@ -930,21 +1028,21 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                             <Truck className="w-5 h-5 text-conquer-navy" />
                           )}
                           <div>
-  <div className="font-medium text-conquer-navy">
-    {m === "PICKUP"
-      ? "Retiro en local"
-      : m === "MOTO"
-      ? "Envío en moto"
-      : "Coordinar"}
-  </div>
-  <div className="text-xs text-gray-500">
-    {m === "PICKUP"
-      ? "Sin costo adicional"
-      : m === "MOTO"
-      ? ""
-      : "Envios al interior"}
-  </div>
-</div>
+                            <div className="font-medium text-conquer-navy">
+                              {m === "PICKUP"
+                                ? "Retiro en local"
+                                : m === "MOTO"
+                                  ? "Envío en moto"
+                                  : "Coordinar"}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {m === "PICKUP"
+                                ? "Sin costo adicional"
+                                : m === "MOTO"
+                                  ? ""
+                                  : "Envios al interior"}
+                            </div>
+                          </div>
                         </div>
                       </label>
                     ))}
@@ -954,13 +1052,15 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                     <div className="mt-5">
                       <div className="flex items-center gap-2 mb-3">
                         <MapPinIcon className="w-5 h-5 text-conquer-navy" />
-                        <label className="text-sm font-medium text-conquer-navy">Selecciona tu localidad *</label>
+                        <label className="text-sm font-medium text-conquer-navy">
+                          Selecciona tu localidad *
+                        </label>
                       </div>
                       <div className="relative">
                         <select
                           className={`h-12 w-full rounded-2xl border px-4 pr-10 appearance-none transition-all focus:outline-none focus:ring-2 ${
-                            getFieldError("motoLocality") 
-                              ? "border-red-500 focus:border-red-500 focus:ring-red-200" 
+                            getFieldError("motoLocality")
+                              ? "border-red-500 focus:border-red-500 focus:ring-red-200"
                               : "border-conquer-pink focus:border-conquer-orange focus:ring-conquer-orange/30"
                           }`}
                           value={`${motoZone}||${motoLocality}`}
@@ -968,18 +1068,39 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                             const [z, loc] = e.target.value.split("||");
                             setMotoZone(z as MotoZone);
                             setMotoLocality(loc);
-                            setTouchedFields(prev => new Set(prev).add("motoLocality"));
+                            setTouchedFields((prev) =>
+                              new Set(prev).add("motoLocality"),
+                            );
                             if (validationErrors.motoLocality) {
-                              setValidationErrors(prev => ({ ...prev, motoLocality: undefined }));
+                              setValidationErrors((prev) => ({
+                                ...prev,
+                                motoLocality: undefined,
+                              }));
                             }
                           }}
-                          onBlur={() => setTouchedFields(prev => new Set(prev).add("motoLocality"))}
+                          onBlur={() =>
+                            setTouchedFields((prev) =>
+                              new Set(prev).add("motoLocality"),
+                            )
+                          }
                         >
                           <option value="">Selecciona una localidad...</option>
                           {(["CABA", "GBA1", "GBA2"] as MotoZone[]).map((z) => (
-                            <optgroup key={z} label={z === "CABA" ? "CABA" : z === "GBA1" ? "GBA Zona 1" : "GBA Zona 2"}>
+                            <optgroup
+                              key={z}
+                              label={
+                                z === "CABA"
+                                  ? "CABA"
+                                  : z === "GBA1"
+                                    ? "GBA Zona 1"
+                                    : "GBA Zona 2"
+                              }
+                            >
                               {motoData[z].map((loc) => (
-                                <option key={`${z}-${loc}`} value={`${z}||${loc}`}>
+                                <option
+                                  key={`${z}-${loc}`}
+                                  value={`${z}||${loc}`}
+                                >
                                   {loc}
                                 </option>
                               ))}
@@ -999,8 +1120,12 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                       {motoLocality && !getFieldError("motoLocality") && (
                         <div className="mt-3 text-sm text-conquer-navy bg-conquer-pink/10 p-3 rounded-xl">
                           <div className="flex justify-between items-center">
-                            <span>Zona: <b>{motoZone}</b></span>
-                            <span className="font-bold">{formatARS(MOTO_PRICES[motoZone])}</span>
+                            <span>
+                              Zona: <b>{motoZone}</b>
+                            </span>
+                            <span className="font-bold">
+                              {formatARS(MOTO_PRICES[motoZone])}
+                            </span>
                           </div>
                           <div className="text-xs text-gray-600 mt-1">
                             Localidad seleccionada: <b>{motoLocality}</b>
@@ -1014,7 +1139,9 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                     <div className="mt-6">
                       <div className="flex items-center gap-2 mb-4">
                         <MapPin className="w-5 h-5 text-conquer-navy" />
-                        <h3 className="text-base font-semibold text-conquer-navy">Dirección de envío</h3>
+                        <h3 className="text-base font-semibold text-conquer-navy">
+                          Dirección de envío
+                        </h3>
                       </div>
                       <div className="grid gap-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1023,8 +1150,18 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                               className={getFieldClassName("shipStreet")}
                               placeholder="Calle *"
                               value={shipStreet}
-                              onChange={(e) => handleFieldChange("shipStreet", e.target.value, setShipStreet)}
-                              onBlur={() => setTouchedFields(prev => new Set(prev).add("shipStreet"))}
+                              onChange={(e) =>
+                                handleFieldChange(
+                                  "shipStreet",
+                                  e.target.value,
+                                  setShipStreet,
+                                )
+                              }
+                              onBlur={() =>
+                                setTouchedFields((prev) =>
+                                  new Set(prev).add("shipStreet"),
+                                )
+                              }
                             />
                             {getFieldError("shipStreet") && (
                               <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
@@ -1038,8 +1175,18 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                               className={getFieldClassName("shipNumber")}
                               placeholder="Número *"
                               value={shipNumber}
-                              onChange={(e) => handleFieldChange("shipNumber", e.target.value, setShipNumber)}
-                              onBlur={() => setTouchedFields(prev => new Set(prev).add("shipNumber"))}
+                              onChange={(e) =>
+                                handleFieldChange(
+                                  "shipNumber",
+                                  e.target.value,
+                                  setShipNumber,
+                                )
+                              }
+                              onBlur={() =>
+                                setTouchedFields((prev) =>
+                                  new Set(prev).add("shipNumber"),
+                                )
+                              }
                             />
                             {getFieldError("shipNumber") && (
                               <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
@@ -1055,8 +1202,18 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                               className={getFieldClassName("shipPostalCode")}
                               placeholder="Código Postal *"
                               value={shipPostalCode}
-                              onChange={(e) => handleFieldChange("shipPostalCode", e.target.value, setShipPostalCode)}
-                              onBlur={() => setTouchedFields(prev => new Set(prev).add("shipPostalCode"))}
+                              onChange={(e) =>
+                                handleFieldChange(
+                                  "shipPostalCode",
+                                  e.target.value,
+                                  setShipPostalCode,
+                                )
+                              }
+                              onBlur={() =>
+                                setTouchedFields((prev) =>
+                                  new Set(prev).add("shipPostalCode"),
+                                )
+                              }
                             />
                             {getFieldError("shipPostalCode") && (
                               <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
@@ -1083,20 +1240,28 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                 <div className="mb-6 rounded-2xl border border-conquer-pink p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <User className="w-5 h-5 text-conquer-navy" />
-                    <h3 className="text-base font-semibold text-conquer-navy">Datos personales</h3>
+                    <h3 className="text-base font-semibold text-conquer-navy">
+                      Datos personales
+                    </h3>
                   </div>
                   <div className="grid gap-4">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <User className="w-4 h-4 text-gray-500" />
-                        <label className="text-sm text-gray-700">Nombre y apellido *</label>
+                        <label className="text-sm text-gray-700">
+                          Nombre y apellido *
+                        </label>
                       </div>
                       <input
                         className={getFieldClassName("name")}
                         placeholder="Ej: Juan Pérez"
                         value={name}
-                        onChange={(e) => handleFieldChange("name", e.target.value, setName)}
-                        onBlur={() => setTouchedFields(prev => new Set(prev).add("name"))}
+                        onChange={(e) =>
+                          handleFieldChange("name", e.target.value, setName)
+                        }
+                        onBlur={() =>
+                          setTouchedFields((prev) => new Set(prev).add("name"))
+                        }
                       />
                       {getFieldError("name") && (
                         <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
@@ -1114,8 +1279,12 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                         className={getFieldClassName("email")}
                         placeholder="ejemplo@email.com"
                         value={email}
-                        onChange={(e) => handleFieldChange("email", e.target.value, setEmail)}
-                        onBlur={() => setTouchedFields(prev => new Set(prev).add("email"))}
+                        onChange={(e) =>
+                          handleFieldChange("email", e.target.value, setEmail)
+                        }
+                        onBlur={() =>
+                          setTouchedFields((prev) => new Set(prev).add("email"))
+                        }
                         type="email"
                       />
                       {getFieldError("email") && (
@@ -1128,14 +1297,20 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <Phone className="w-4 h-4 text-gray-500" />
-                        <label className="text-sm text-gray-700">Teléfono (opcional)</label>
+                        <label className="text-sm text-gray-700">
+                          Teléfono (opcional)
+                        </label>
                       </div>
                       <input
                         className={getFieldClassName("phone")}
                         placeholder="11 1234-5678"
                         value={phone}
-                        onChange={(e) => handleFieldChange("phone", e.target.value, setPhone)}
-                        onBlur={() => setTouchedFields(prev => new Set(prev).add("phone"))}
+                        onChange={(e) =>
+                          handleFieldChange("phone", e.target.value, setPhone)
+                        }
+                        onBlur={() =>
+                          setTouchedFields((prev) => new Set(prev).add("phone"))
+                        }
                         type="tel"
                       />
                       {getFieldError("phone") && (
@@ -1150,185 +1325,262 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
 
                 {/* Facturación */}
                 <div className="mb-6 rounded-2xl border border-conquer-pink p-5">
-  <div className="flex items-center gap-2 mb-4">
-    <Receipt className="w-5 h-5 text-conquer-navy" />
-    <h3 className="text-base font-semibold text-conquer-navy">Facturación</h3>
-  </div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Receipt className="w-5 h-5 text-conquer-navy" />
+                    <h3 className="text-base font-semibold text-conquer-navy">
+                      Facturación
+                    </h3>
+                  </div>
 
-  <div className="flex flex-wrap gap-4 mb-4">
-    <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
-      <input
-        type="radio"
-        checked={invoiceType === "CONSUMIDOR_FINAL"}
-        onChange={() => setInvoiceType("CONSUMIDOR_FINAL")}
-        className="text-conquer-orange"
-      />
-      <span className="text-sm font-medium">Consumidor Final</span>
-    </label>
+                  <div className="flex flex-wrap gap-4 mb-4">
+                    <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
+                      <input
+                        type="radio"
+                        checked={invoiceType === "CONSUMIDOR_FINAL"}
+                        onChange={() => setInvoiceType("CONSUMIDOR_FINAL")}
+                        className="text-conquer-orange"
+                      />
+                      <span className="text-sm font-medium">
+                        Consumidor Final
+                      </span>
+                    </label>
 
-    <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
-      <input
-        type="radio"
-        checked={invoiceType === "IVA_EXENTO"}
-        onChange={() => setInvoiceType("IVA_EXENTO")}
-        className="text-conquer-orange"
-      />
-      <span className="text-sm font-medium">IVA Exento</span>
-    </label>
+                    <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
+                      <input
+                        type="radio"
+                        checked={invoiceType === "IVA_EXENTO"}
+                        onChange={() => setInvoiceType("IVA_EXENTO")}
+                        className="text-conquer-orange"
+                      />
+                      <span className="text-sm font-medium">IVA Exento</span>
+                    </label>
 
-    <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
-      <input
-        type="radio"
-        checked={invoiceType === "RESPONSABLE_INSCRIPTO"}
-        onChange={() => setInvoiceType("RESPONSABLE_INSCRIPTO")}
-        className="text-conquer-orange"
-      />
-      <span className="text-sm font-medium">Responsable Inscripto </span>
-      <span className="text-xs text-gray-500">(Factura A)</span>
-    </label>
-  </div>
-  {needsAddress && (
-  <label className="flex items-center gap-2 px-4 py-3 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
-    <input
-      type="checkbox"
-      checked={useShippingForInvoice}
-      onChange={(e) => setUseShippingForInvoice(e.target.checked)}
-      className="text-conquer-orange"
-    />
-    <span className="text-sm font-medium text-conquer-navy">
-      Usar los mismos datos del envío para facturación
-    </span>
-  </label>
-)}
+                    <label className="flex items-center gap-2 px-4 py-2 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
+                      <input
+                        type="radio"
+                        checked={invoiceType === "RESPONSABLE_INSCRIPTO"}
+                        onChange={() => setInvoiceType("RESPONSABLE_INSCRIPTO")}
+                        className="text-conquer-orange"
+                      />
+                      <span className="text-sm font-medium">
+                        Responsable Inscripto{" "}
+                      </span>
+                      <span className="text-xs text-gray-500">(Factura A)</span>
+                    </label>
+                  </div>
+                  {needsAddress && (
+                    <label className="flex items-center gap-2 px-4 py-3 rounded-xl border border-conquer-pink cursor-pointer hover:bg-conquer-pink/5">
+                      <input
+                        type="checkbox"
+                        checked={useShippingForInvoice}
+                        onChange={(e) =>
+                          setUseShippingForInvoice(e.target.checked)
+                        }
+                        className="text-conquer-orange"
+                      />
+                      <span className="text-sm font-medium text-conquer-navy">
+                        Usar los mismos datos del envío para facturación
+                      </span>
+                    </label>
+                  )}
 
-  <div className="mt-4 grid gap-4">
-    <div>
-      <div className="flex items-center gap-2 mb-2">
-        <Building className="w-4 h-4 text-gray-500" />
-        <label className="text-sm text-gray-700">Dirección de facturación *</label>
-      </div>
-      <input
-  className={`${getFieldClassName("invoiceAddress")} ${useShippingForInvoice ? "bg-gray-100 cursor-not-allowed" : ""}`}
-  placeholder="Calle y número"
-  value={invoiceAddress}
-  onChange={(e) => handleFieldChange("invoiceAddress", e.target.value, setInvoiceAddress)}
-  onBlur={() => setTouchedFields(prev => new Set(prev).add("invoiceAddress"))}
-  disabled={useShippingForInvoice}
-/>
-      {getFieldError("invoiceAddress") && (
-        <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
-          <AlertCircle className="w-4 h-4" />
-          {getFieldError("invoiceAddress")}
-        </div>
-      )}
-    </div>
+                  <div className="mt-4 grid gap-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Building className="w-4 h-4 text-gray-500" />
+                        <label className="text-sm text-gray-700">
+                          Dirección de facturación *
+                        </label>
+                      </div>
+                      <input
+                        className={`${getFieldClassName("invoiceAddress")} ${useShippingForInvoice ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                        placeholder="Calle y número"
+                        value={invoiceAddress}
+                        onChange={(e) =>
+                          handleFieldChange(
+                            "invoiceAddress",
+                            e.target.value,
+                            setInvoiceAddress,
+                          )
+                        }
+                        onBlur={() =>
+                          setTouchedFields((prev) =>
+                            new Set(prev).add("invoiceAddress"),
+                          )
+                        }
+                        disabled={useShippingForInvoice}
+                      />
+                      {getFieldError("invoiceAddress") && (
+                        <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                          <AlertCircle className="w-4 h-4" />
+                          {getFieldError("invoiceAddress")}
+                        </div>
+                      )}
+                    </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <Building className="w-4 h-4 text-gray-500" />
-          <label className="text-sm text-gray-700">Localidad *</label>
-        </div>
-        <input
-  className={`${getFieldClassName("invoiceCity")} ${useShippingForInvoice ? "bg-gray-100 cursor-not-allowed" : ""}`}
-  placeholder="Localidad"
-  value={invoiceCity}
-  onChange={(e) => handleFieldChange("invoiceCity", e.target.value, setInvoiceCity)}
-  onBlur={() => setTouchedFields(prev => new Set(prev).add("invoiceCity"))}
-  disabled={useShippingForInvoice}
-/>
-        {getFieldError("invoiceCity") && (
-          <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
-            <AlertCircle className="w-4 h-4" />
-            {getFieldError("invoiceCity")}
-          </div>
-        )}
-      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Building className="w-4 h-4 text-gray-500" />
+                          <label className="text-sm text-gray-700">
+                            Localidad *
+                          </label>
+                        </div>
+                        <input
+                          className={`${getFieldClassName("invoiceCity")} ${useShippingForInvoice ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                          placeholder="Localidad"
+                          value={invoiceCity}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              "invoiceCity",
+                              e.target.value,
+                              setInvoiceCity,
+                            )
+                          }
+                          onBlur={() =>
+                            setTouchedFields((prev) =>
+                              new Set(prev).add("invoiceCity"),
+                            )
+                          }
+                          disabled={useShippingForInvoice}
+                        />
+                        {getFieldError("invoiceCity") && (
+                          <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                            <AlertCircle className="w-4 h-4" />
+                            {getFieldError("invoiceCity")}
+                          </div>
+                        )}
+                      </div>
 
-      <div>
-        <div className="flex items-center gap-2 mb-2">
-          <Building className="w-4 h-4 text-gray-500" />
-          <label className="text-sm text-gray-700">Código Postal *</label>
-        </div>
-        <input
-  className={`${getFieldClassName("invoicePostalCode")} ${useShippingForInvoice ? "bg-gray-100 cursor-not-allowed" : ""}`}
-  placeholder="Código Postal"
-  value={invoicePostalCode}
-  onChange={(e) => handleFieldChange("invoicePostalCode", e.target.value, setInvoicePostalCode)}
-  onBlur={() => setTouchedFields(prev => new Set(prev).add("invoicePostalCode"))}
-  disabled={useShippingForInvoice}
-/>
-        {getFieldError("invoicePostalCode") && (
-          <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
-            <AlertCircle className="w-4 h-4" />
-            {getFieldError("invoicePostalCode")}
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Building className="w-4 h-4 text-gray-500" />
+                          <label className="text-sm text-gray-700">
+                            Código Postal *
+                          </label>
+                        </div>
+                        <input
+                          className={`${getFieldClassName("invoicePostalCode")} ${useShippingForInvoice ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                          placeholder="Código Postal"
+                          value={invoicePostalCode}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              "invoicePostalCode",
+                              e.target.value,
+                              setInvoicePostalCode,
+                            )
+                          }
+                          onBlur={() =>
+                            setTouchedFields((prev) =>
+                              new Set(prev).add("invoicePostalCode"),
+                            )
+                          }
+                          disabled={useShippingForInvoice}
+                        />
+                        {getFieldError("invoicePostalCode") && (
+                          <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                            <AlertCircle className="w-4 h-4" />
+                            {getFieldError("invoicePostalCode")}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-  {(invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") && (
-    <div className="mt-4 grid gap-4">
-  <div>
-    <div className="flex items-center gap-2 mb-2">
-      <Building className="w-4 h-4 text-gray-500" />
-      <label className="text-sm text-gray-700">
-        CUIT {invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO" ? "*" : "(opcional)"}
-      </label>
-    </div>
-    <input
-      className={getFieldClassName("invoiceCuit")}
-      placeholder="30-12345678-9 o 30123456789"
-      value={invoiceCuit}
-      onChange={(e) => handleFieldChange("invoiceCuit", e.target.value, setInvoiceCuit)}
-      onBlur={() => setTouchedFields(prev => new Set(prev).add("invoiceCuit"))}
-    />
-    {getFieldError("invoiceCuit") && (
-      <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
-        <AlertCircle className="w-4 h-4" />
-        {getFieldError("invoiceCuit")}
-      </div>
-    )}
-  </div>
+                  {(invoiceType === "IVA_EXENTO" ||
+                    invoiceType === "RESPONSABLE_INSCRIPTO") && (
+                    <div className="mt-4 grid gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Building className="w-4 h-4 text-gray-500" />
+                          <label className="text-sm text-gray-700">
+                            CUIT{" "}
+                            {invoiceType === "IVA_EXENTO" ||
+                            invoiceType === "RESPONSABLE_INSCRIPTO"
+                              ? "*"
+                              : "(opcional)"}
+                          </label>
+                        </div>
+                        <input
+                          className={getFieldClassName("invoiceCuit")}
+                          placeholder="30-12345678-9 o 30123456789"
+                          value={invoiceCuit}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              "invoiceCuit",
+                              e.target.value,
+                              setInvoiceCuit,
+                            )
+                          }
+                          onBlur={() =>
+                            setTouchedFields((prev) =>
+                              new Set(prev).add("invoiceCuit"),
+                            )
+                          }
+                        />
+                        {getFieldError("invoiceCuit") && (
+                          <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                            <AlertCircle className="w-4 h-4" />
+                            {getFieldError("invoiceCuit")}
+                          </div>
+                        )}
+                      </div>
 
-  <div>
-    <div className="flex items-center gap-2 mb-2">
-      <Building className="w-4 h-4 text-gray-500" />
-      <label className="text-sm text-gray-700">
-        Razón social {invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO" ? "*" : "(opcional)"}
-      </label>
-    </div>
-    <input
-      className={getFieldClassName("invoiceBusinessName")}
-      placeholder="Empresa S.A. / Nombre y apellido"
-      value={invoiceBusinessName}
-      onChange={(e) => handleFieldChange("invoiceBusinessName", e.target.value, setInvoiceBusinessName)}
-      onBlur={() => setTouchedFields(prev => new Set(prev).add("invoiceBusinessName"))}
-    />
-    {getFieldError("invoiceBusinessName") && (
-      <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
-        <AlertCircle className="w-4 h-4" />
-        {getFieldError("invoiceBusinessName")}
-      </div>
-    )}
-  </div>
-</div>
-  )}
-</div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Building className="w-4 h-4 text-gray-500" />
+                          <label className="text-sm text-gray-700">
+                            Razón social{" "}
+                            {invoiceType === "IVA_EXENTO" ||
+                            invoiceType === "RESPONSABLE_INSCRIPTO"
+                              ? "*"
+                              : "(opcional)"}
+                          </label>
+                        </div>
+                        <input
+                          className={getFieldClassName("invoiceBusinessName")}
+                          placeholder="Empresa S.A. / Nombre y apellido"
+                          value={invoiceBusinessName}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              "invoiceBusinessName",
+                              e.target.value,
+                              setInvoiceBusinessName,
+                            )
+                          }
+                          onBlur={() =>
+                            setTouchedFields((prev) =>
+                              new Set(prev).add("invoiceBusinessName"),
+                            )
+                          }
+                        />
+                        {getFieldError("invoiceBusinessName") && (
+                          <div className="text-red-500 text-xs mt-2 flex items-center gap-1">
+                            <AlertCircle className="w-4 h-4" />
+                            {getFieldError("invoiceBusinessName")}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Pago */}
                 <div className="mb-6 rounded-2xl border border-conquer-pink p-5">
                   <div className="flex items-center gap-2 mb-4">
                     <CreditCard className="w-5 h-5 text-conquer-navy" />
-                    <h3 className="text-base font-semibold text-conquer-navy">Método de pago</h3>
+                    <h3 className="text-base font-semibold text-conquer-navy">
+                      Método de pago
+                    </h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
-                      paymentMethod === "CASH" 
-                        ? "border-conquer-orange bg-conquer-orange/5" 
-                        : "border-conquer-pink hover:border-conquer-orange/50"
-                    } ${shippingMethod !== "PICKUP" ? "opacity-50 cursor-not-allowed" : ""}`}>
+                    <label
+                      className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                        paymentMethod === "CASH"
+                          ? "border-conquer-orange bg-conquer-orange/5"
+                          : "border-conquer-pink hover:border-conquer-orange/50"
+                      } ${shippingMethod !== "PICKUP" ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
                       <input
                         type="radio"
                         checked={paymentMethod === "CASH"}
@@ -1339,68 +1591,90 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                       <div className="flex items-center gap-3">
                         <Wallet className="w-5 h-5 text-conquer-navy" />
                         <div>
-                          <div className="font-medium text-conquer-navy">Efectivo</div>
-                          <div className="text-xs text-gray-500">Solo retiro</div>
+                          <div className="font-medium text-conquer-navy">
+                            Efectivo
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Solo retiro
+                          </div>
                         </div>
                       </div>
                     </label>
 
-                    <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
-                      paymentMethod === "TRANSFER" 
-                        ? "border-conquer-orange bg-conquer-orange/5" 
-                        : "border-conquer-pink hover:border-conquer-orange/50"
-                    }`}>
-                      <input 
-                        type="radio" 
-                        checked={paymentMethod === "TRANSFER"} 
-                        onChange={() => setPaymentMethod("TRANSFER")} 
+                    <label
+                      className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                        paymentMethod === "TRANSFER"
+                          ? "border-conquer-orange bg-conquer-orange/5"
+                          : "border-conquer-pink hover:border-conquer-orange/50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        checked={paymentMethod === "TRANSFER"}
+                        onChange={() => setPaymentMethod("TRANSFER")}
                         className="text-conquer-orange"
                       />
                       <div className="flex items-center gap-3">
                         <CreditCard className="w-5 h-5 text-conquer-navy" />
                         <div>
-                          <div className="font-medium text-conquer-navy">Transferencia</div>
-                          <div className="text-xs text-gray-500">Sin recargo</div>
+                          <div className="font-medium text-conquer-navy">
+                            Transferencia
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Sin recargo
+                          </div>
                         </div>
                       </div>
                     </label>
                     {enableMercadoPago && (
-                    <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
-  paymentMethod === "MERCADO_PAGO" 
-    ? "border-conquer-orange bg-conquer-orange/5" 
-    : "border-conquer-pink hover:border-conquer-orange/50"
-}`}>
-  <input 
-    type="radio" 
-    checked={paymentMethod === "MERCADO_PAGO"} 
-    onChange={() => setPaymentMethod("MERCADO_PAGO")} 
-    className="text-conquer-orange"
-  />
-  <div className="flex items-center gap-3">
-    <CreditCard className="w-5 h-5 text-conquer-navy" />
-    <div>
-      <div className="font-medium text-conquer-navy">Mercado Pago</div>
-      <div className="text-xs text-gray-500">+5% recargo</div>
-    </div>
-  </div>
-</label>
+                      <label
+                        className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                          paymentMethod === "MERCADO_PAGO"
+                            ? "border-conquer-orange bg-conquer-orange/5"
+                            : "border-conquer-pink hover:border-conquer-orange/50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          checked={paymentMethod === "MERCADO_PAGO"}
+                          onChange={() => setPaymentMethod("MERCADO_PAGO")}
+                          className="text-conquer-orange"
+                        />
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="w-5 h-5 text-conquer-navy" />
+                          <div>
+                            <div className="font-medium text-conquer-navy">
+                              Mercado Pago
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              +5% recargo
+                            </div>
+                          </div>
+                        </div>
+                      </label>
                     )}
-                    <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
-                      paymentMethod === "COORDINATE" 
-                        ? "border-conquer-orange bg-conquer-orange/5" 
-                        : "border-conquer-pink hover:border-conquer-orange/50"
-                    }`}>
-                      <input 
-                        type="radio" 
-                        checked={paymentMethod === "COORDINATE"} 
-                        onChange={() => setPaymentMethod("COORDINATE")} 
+                    <label
+                      className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
+                        paymentMethod === "COORDINATE"
+                          ? "border-conquer-orange bg-conquer-orange/5"
+                          : "border-conquer-pink hover:border-conquer-orange/50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        checked={paymentMethod === "COORDINATE"}
+                        onChange={() => setPaymentMethod("COORDINATE")}
                         className="text-conquer-orange"
                       />
                       <div className="flex items-center gap-3">
                         <MessageCircle className="w-5 h-5 text-conquer-navy" />
                         <div>
-                          <div className="font-medium text-conquer-navy">Coordinación</div>
-                          <div className="text-xs text-gray-500">Vía WhatsApp</div>
+                          <div className="font-medium text-conquer-navy">
+                            Coordinación
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Vía WhatsApp
+                          </div>
                         </div>
                       </div>
                     </label>
@@ -1423,53 +1697,53 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                       Por favor, corrige los siguientes errores:
                     </div>
                     <ul className="text-red-500 text-sm list-disc pl-5 space-y-1">
-                      {Object.entries(validationErrors).map(([key, error]) => (
-                        error && <li key={key}>{error}</li>
-                      ))}
+                      {Object.entries(validationErrors).map(
+                        ([key, error]) => error && <li key={key}>{error}</li>,
+                      )}
                     </ul>
                   </div>
                 )}
 
-               {/* Botones finales */}
+                {/* Botones finales */}
                 <div className="space-y-3">
-                {/* Mensaje de mínimo de compra */}
-                {!meetsMinimum && (
-                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-amber-600" />
-                    <span className="text-sm text-amber-800">
-                      El pedido mínimo es de {formatARS(MIN_PURCHASE)}.
-                    </span>
-                  </div>
-  )}
+                  {/* Mensaje de mínimo de compra */}
+                  {!meetsMinimum && (
+                    <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-amber-600" />
+                      <span className="text-sm text-amber-800">
+                        El pedido mínimo es de {formatARS(MIN_PURCHASE)}.
+                      </span>
+                    </div>
+                  )}
 
-  <button
-    type="button"
-    disabled={disabledStep3 || loading || !meetsMinimum}
-    onClick={createOrder}
-    className="h-14 w-full rounded-2xl bg-conquer-orange text-white font-bold text-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-3 transition-all shadow-md hover:shadow-lg"
-  >
-    {loading ? (
-      <>
-        <Loader2 className="w-5 h-5 animate-spin" />
-        Procesando pedido...
-      </>
-    ) : (
-      <>
-        <CheckCircle className="w-5 h-5" />
-        Confirmar pedido
-      </>
-    )}
-  </button>
+                  <button
+                    type="button"
+                    disabled={disabledStep3 || loading || !meetsMinimum}
+                    onClick={createOrder}
+                    className="h-14 w-full rounded-2xl bg-conquer-orange text-white font-bold text-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-3 transition-all shadow-md hover:shadow-lg"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Procesando pedido...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-5 h-5" />
+                        Confirmar pedido
+                      </>
+                    )}
+                  </button>
 
-  <button
-    type="button"
-    onClick={handlePrevStep}
-    className="h-12 w-full rounded-2xl border border-conquer-pink text-conquer-navy font-medium hover:bg-conquer-pink/10 flex items-center justify-center gap-2"
-  >
-    <ArrowLeft className="w-5 h-5" />
-    Volver al paso anterior
-  </button>
-</div>
+                  <button
+                    type="button"
+                    onClick={handlePrevStep}
+                    className="h-12 w-full rounded-2xl border border-conquer-pink text-conquer-navy font-medium hover:bg-conquer-pink/10 flex items-center justify-center gap-2"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                    Volver al paso anterior
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1478,15 +1752,22 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
           <div className="rounded-3xl border border-conquer-pink bg-white p-5 md:p-6 h-fit sticky top-6">
             <div className="flex items-center gap-2 mb-6">
               <Receipt className="w-6 h-6 text-conquer-orange" />
-              <h2 className="text-lg font-bold text-conquer-navy">Resumen del pedido</h2>
+              <h2 className="text-lg font-bold text-conquer-navy">
+                Resumen del pedido
+              </h2>
             </div>
 
             {/* Productos en resumen */}
             <div className="mb-4 max-h-64 overflow-y-auto pr-2">
               {items.map((i) => (
-                <div key={`${i.productId}-${(i as any).variantId}`} className="flex justify-between items-center py-3 border-b border-conquer-pink/30 last:border-0">
+                <div
+                  key={`${i.productId}-${(i as any).variantId}`}
+                  className="flex justify-between items-center py-3 border-b border-conquer-pink/30 last:border-0"
+                >
                   <div className="flex-1">
-                    <div className="font-medium text-conquer-navy text-sm">{i.name}</div>
+                    <div className="font-medium text-conquer-navy text-sm">
+                      {i.name}
+                    </div>
                     <div className="text-xs text-gray-500">
                       Cantidad: {i.qty} × {formatARS(i.unitPrice)}
                     </div>
@@ -1518,7 +1799,9 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                 {surcharge > 0 && (
                   <div className="flex justify-between text-sm text-gray-700">
                     <span>Recargo Mercado Pago</span>
-                    <span className="font-medium text-amber-600">{formatARS(surcharge)}</span>
+                    <span className="font-medium text-amber-600">
+                      {formatARS(surcharge)}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1532,18 +1815,20 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
             {/* Información adicional */}
             <div className="mt-6 space-y-3">
               <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
-  <Truck className="w-5 h-5 text-blue-500 mt-0.5" />
-  <div>
-    <p className="text-sm font-medium text-blue-800">Modalidad de entrega</p>
-    <p className="text-xs text-blue-600">
-      {shippingMethod === "PICKUP"
-        ? "Elegiste retiro en el local. También realizamos envíos en moto y coordinamos envíos al interior."
-        : shippingMethod === "MOTO"
-        ? `Elegiste envío en moto${motoLocality ? ` a ${motoLocality}` : ""}. También podés retirar en el local o coordinar envíos al interior.`
-        : "Elegiste coordinar envío al interior. También podés retirar en el local o solicitar envío en moto según la zona."}
-    </p>
-  </div>
-</div>
+                <Truck className="w-5 h-5 text-blue-500 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-blue-800">
+                    Modalidad de entrega
+                  </p>
+                  <p className="text-xs text-blue-600">
+                    {shippingMethod === "PICKUP"
+                      ? "Elegiste retiro en el local. También realizamos envíos en moto y coordinamos envíos al interior."
+                      : shippingMethod === "MOTO"
+                        ? `Elegiste envío en moto${motoLocality ? ` a ${motoLocality}` : ""}. También podés retirar en el local o coordinar envíos al interior.`
+                        : "Elegiste coordinar envío al interior. También podés retirar en el local o solicitar envío en moto según la zona."}
+                  </p>
+                </div>
+              </div>
 
               <div className="flex items-start gap-3 p-3 rounded-xl bg-green-50 border border-green-100">
                 <CreditCard className="w-5 h-5 text-green-500 mt-0.5" />
@@ -1551,17 +1836,26 @@ if (invoiceType === "IVA_EXENTO" || invoiceType === "RESPONSABLE_INSCRIPTO") {
                   <p className="text-sm font-medium text-green-800">Pago</p>
                   <p className="text-xs text-green-600">
                     {paymentMethod === "CASH" && "Pago en efectivo al retirar."}
-                    {paymentMethod === "TRANSFER" && "Transferencia bancaria sin recargos."}
-                    {paymentMethod === "COORDINATE" && "Coordinaremos el pago vía WhatsApp."}
-                    {paymentMethod === "MERCADO_PAGO" && "Pago con Mercado Pago con 5% de recargo."}
+                    {paymentMethod === "TRANSFER" &&
+                      "Transferencia bancaria sin recargos."}
+                    {paymentMethod === "COORDINATE" &&
+                      "Coordinaremos el pago vía WhatsApp."}
+                    {paymentMethod === "MERCADO_PAGO" &&
+                      "Pago con Mercado Pago con 5% de recargo."}
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="mt-6 text-xs text-gray-500">
-              <p className="mb-2">* Los precios de productos están expresados en neto, se suma IVA en el checkout.</p>
-              <p>** Una vez confirmado el pedido, recibirás un email con los detalles.</p>
+              <p className="mb-2">
+                * Los precios de productos están expresados en neto, se suma IVA
+                en el checkout.
+              </p>
+              <p>
+                ** Una vez confirmado el pedido, recibirás un email con los
+                detalles.
+              </p>
             </div>
           </div>
         </div>

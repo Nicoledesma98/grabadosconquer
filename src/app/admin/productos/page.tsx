@@ -33,7 +33,8 @@ function parseStatus(raw: unknown): StatusKey {
 
 function parseSort(raw: unknown): SortKey {
   const s = typeof raw === "string" ? raw : "";
-  if (s === "new" || s === "old" || s === "name_asc" || s === "name_desc") return s;
+  if (s === "new" || s === "old" || s === "name_asc" || s === "name_desc")
+    return s;
   return "new";
 }
 
@@ -67,10 +68,10 @@ export default async function AdminProductosPage({
     sort === "new"
       ? ({ createdAt: "desc" } as const)
       : sort === "old"
-      ? ({ createdAt: "asc" } as const)
-      : sort === "name_asc"
-      ? ({ name: "asc" } as const)
-      : ({ name: "desc" } as const);
+        ? ({ createdAt: "asc" } as const)
+        : sort === "name_asc"
+          ? ({ name: "asc" } as const)
+          : ({ name: "desc" } as const);
 
   const total = await prisma.product.count({ where });
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -83,7 +84,12 @@ export default async function AdminProductosPage({
     take: PAGE_SIZE,
     include: {
       images: { take: 1, orderBy: { sort: "asc" } },
-      variants: { select: { id: true } },
+      variants: {
+        select: {
+          id: true,
+          priceOverride: true,
+        },
+      },
       categories: { select: { id: true } },
       priceTiers: { select: { id: true } },
     },
@@ -103,11 +109,13 @@ export default async function AdminProductosPage({
     page: page < totalPages ? page + 1 : undefined,
   })}`;
 
-  const pageLinks = Array.from({ length: totalPages }, (_, i) => i + 1).filter((p) => {
-    if (p === 1 || p === totalPages) return true;
-    if (Math.abs(p - page) <= 2) return true;
-    return false;
-  });
+  const pageLinks = Array.from({ length: totalPages }, (_, i) => i + 1).filter(
+    (p) => {
+      if (p === 1 || p === totalPages) return true;
+      if (Math.abs(p - page) <= 2) return true;
+      return false;
+    },
+  );
 
   return (
     <main className="p-6 max-w-6xl mx-auto">
@@ -187,6 +195,15 @@ export default async function AdminProductosPage({
             {products.map((p) => {
               const img = p.images[0]?.url ?? null;
 
+              const variantPrices = p.variants
+                .map((v) => v.priceOverride ?? 0)
+                .filter((price) => price > 0);
+
+              const visiblePrice =
+                variantPrices.length > 0
+                  ? Math.min(...variantPrices) / 100
+                  : (p.basePrice ?? null);
+
               return (
                 <details
                   key={p.id}
@@ -197,15 +214,23 @@ export default async function AdminProductosPage({
                       <div className="h-14 w-14 rounded-2xl border border-conquer-pink bg-neutral-100 overflow-hidden flex items-center justify-center shrink-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         {img ? (
-                          <img src={img} alt={p.name} className="h-full w-full object-cover" />
+                          <img
+                            src={img}
+                            alt={p.name}
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
-                          <span className="text-[10px] text-neutral-500">Sin img</span>
+                          <span className="text-[10px] text-neutral-500">
+                            Sin img
+                          </span>
                         )}
                       </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <div className="font-semibold text-conquer-navy truncate">{p.name}</div>
+                          <div className="font-semibold text-conquer-navy truncate">
+                            {p.name}
+                          </div>
                           <span
                             className={`text-xs px-2 py-1 rounded-full border ${
                               p.active
@@ -219,20 +244,31 @@ export default async function AdminProductosPage({
 
                         <div className="mt-1 text-xs text-neutral-600 truncate">
                           slug: <b>{p.slug}</b>
-                          {p.basePrice != null ? (
+                          {visiblePrice != null ? (
                             <>
-                              {" "}— base: <b>${p.basePrice}</b>
+                              {" "}
+                              — visible: <b>${visiblePrice}</b>
+                            </>
+                          ) : null}
+                          {p.basePrice != null &&
+                          visiblePrice !== p.basePrice ? (
+                            <>
+                              {" "}
+                              — base manual: <b>${p.basePrice}</b>
                             </>
                           ) : null}
                         </div>
 
                         <div className="mt-1 text-xs text-neutral-500">
-                          Variantes: <b>{p.variants.length}</b> · Tiers: <b>{p.priceTiers.length}</b> · Categorías:{" "}
+                          Variantes: <b>{p.variants.length}</b> · Tiers:{" "}
+                          <b>{p.priceTiers.length}</b> · Categorías:{" "}
                           <b>{p.categories.length}</b>
                         </div>
                       </div>
 
-                      <div className="text-xs text-neutral-500">(click para abrir)</div>
+                      <div className="text-xs text-neutral-500">
+                        (click para abrir)
+                      </div>
                     </div>
                   </summary>
 
@@ -240,7 +276,9 @@ export default async function AdminProductosPage({
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl border border-conquer-pink p-3">
                         <div className="text-xs text-neutral-500">ID</div>
-                        <div className="text-sm font-mono break-all">{p.id}</div>
+                        <div className="text-sm font-mono break-all">
+                          {p.id}
+                        </div>
                       </div>
 
                       <div className="rounded-2xl border border-conquer-pink p-3">
@@ -266,7 +304,9 @@ export default async function AdminProductosPage({
 
                     {p.description ? (
                       <div className="mt-3 rounded-2xl border border-conquer-pink p-3 text-sm text-neutral-700">
-                        <div className="text-xs text-neutral-500 mb-1">Descripción</div>
+                        <div className="text-xs text-neutral-500 mb-1">
+                          Descripción
+                        </div>
                         {p.description}
                       </div>
                     ) : null}
@@ -284,7 +324,9 @@ export default async function AdminProductosPage({
                   href={prevHref}
                   aria-disabled={page <= 1}
                   className={`h-10 px-4 rounded-2xl border border-conquer-pink flex items-center justify-center ${
-                    page <= 1 ? "opacity-50 pointer-events-none" : "hover:bg-conquer-pink/10"
+                    page <= 1
+                      ? "opacity-50 pointer-events-none"
+                      : "hover:bg-conquer-pink/10"
                   }`}
                 >
                   ← Anterior
@@ -296,7 +338,9 @@ export default async function AdminProductosPage({
 
                   return (
                     <span key={pNum} className="flex items-center gap-2">
-                      {showDots && <span className="px-1 text-neutral-400">…</span>}
+                      {showDots && (
+                        <span className="px-1 text-neutral-400">…</span>
+                      )}
                       <Link
                         href={`/admin/productos${buildQueryString({
                           q,
@@ -320,7 +364,9 @@ export default async function AdminProductosPage({
                   href={nextHref}
                   aria-disabled={page >= totalPages}
                   className={`h-10 px-4 rounded-2xl border border-conquer-pink flex items-center justify-center ${
-                    page >= totalPages ? "opacity-50 pointer-events-none" : "hover:bg-conquer-pink/10"
+                    page >= totalPages
+                      ? "opacity-50 pointer-events-none"
+                      : "hover:bg-conquer-pink/10"
                   }`}
                 >
                   Siguiente →

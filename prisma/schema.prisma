@@ -64,6 +64,18 @@ enum MotoZone {
   GBA2
 }
 
+enum StockSource {
+  OWN
+  SUPPLIER
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+  SYNC
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -75,9 +87,10 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  orders   Order[]
-  accounts Account[]
-  sessions Session[]
+  stockMovements StockMovement[]
+  orders         Order[]
+  accounts       Account[]
+  sessions       Session[]
 }
 
 model Product {
@@ -94,7 +107,11 @@ model Product {
   heightMm     Int?
   stock        Int?
 
-  minQtyStep Int @default(1)
+  minQtyStep     Int @default(1)
+  minPurchaseQty Int @default(1)
+
+  discountActive  Boolean @default(false)
+  discountPercent Int     @default(0)
 
   allowedMethods PersonalizationMethod[] @default([])
 
@@ -106,7 +123,8 @@ model Product {
   supplierMap SupplierProduct[]
   categories  Category[]
 
-  orderItems OrderItem[] // ✅ agregar esto
+  orderItems     OrderItem[]
+  stockMovements StockMovement[]
 }
 
 model IntegrationLock {
@@ -139,22 +157,28 @@ model ProductVariant {
   // si querés imágenes por variante (opcional)
   images ProductImage[] // lo resolvemos abajo con un campo variantId
 
-  supplierMaps SupplierProduct[]
+  supplierMaps   SupplierProduct[]
+  stockMovements StockMovement[]
 
   @@unique([productId, externalVariantId])
   @@index([productId])
 }
 
 model Category {
-  id        String    @id @default(cuid())
-  slug      String    @unique
-  name      String
-  active    Boolean   @default(true)
-  order     Int       @default(0)
-  image     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  products  Product[]
+  id     String  @id @default(cuid())
+  slug   String  @unique
+  name   String
+  active Boolean @default(true)
+  order  Int     @default(0)
+  image  String?
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  parentId  String?
+  parent    Category?  @relation("CategoryToChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Category[] @relation("CategoryToChildren")
+
+  products Product[]
 }
 
 model ProductImage {
@@ -290,6 +314,8 @@ model Order {
   shipApartment       String?
   shipLocality        String?
 
+  stockMovements StockMovement[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -346,6 +372,34 @@ model OrderUpload {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+}
+
+model StockMovement {
+  id            String            @id @default(cuid())
+  variantId     String?
+  productId     String?
+  source        StockSource
+  movementType  StockMovementType
+  quantity      Int
+  previousStock Int?
+  newStock      Int?
+  orderId       String?
+  notes         String?
+  createdById   String?
+  createdAt     DateTime          @default(now())
+
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order     Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdBy User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([variantId])
+  @@index([productId])
+  @@index([orderId])
+  @@index([createdById])
+  @@index([source])
+  @@index([movementType])
+  @@index([createdAt])
 }
 
 model Account {

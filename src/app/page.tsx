@@ -8,15 +8,16 @@ export const runtime = "nodejs";
 
 export default async function HomePage() {
   // 🔥 Categorías dinámicas desde la base de datos
-  const categories = await prisma.category.findMany({
-    where: { active: true },
-    orderBy: { order: "asc" },
-    select: {
-      slug: true,
-      name: true,
-      image: true,
-    },
-  });
+const categories = await prisma.category.findMany({
+  where: { active: true },
+  orderBy: { name: "asc" },
+  select: {
+    slug: true,
+    name: true,
+    image: true,
+    parentId: true,
+  },
+});
 
   return (
     <main className="py-8">

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchStockSurPage } from "@/lib/suppliers/stocksur/client";
-//import { uploadImageFromUrl } from "@/lib/cloudinary/uploadFromUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,25 +18,24 @@ function slugify(text: string): string {
 
 async function getUniqueSlug(baseName: string, existingId?: string): Promise<string> {
   let slug = slugify(baseName);
-  // Verificar si ya existe algún producto con ese slug
+
   let exists = await prisma.product.findFirst({
-    where: { slug, NOT: existingId ? { id: existingId } : undefined }
+    where: { slug, NOT: existingId ? { id: existingId } : undefined },
   });
   if (!exists) return slug;
 
-  // Si existe, añadir un sufijo numérico
   let counter = 1;
   while (exists) {
     const candidate = `${slug}-${counter}`;
     exists = await prisma.product.findFirst({
-      where: { slug: candidate, NOT: existingId ? { id: existingId } : undefined }
+      where: { slug: candidate, NOT: existingId ? { id: existingId } : undefined },
     });
     if (!exists) return candidate;
     counter++;
   }
-  return slug; // fallback
-}
 
+  return slug;
+}
 
 async function ensureSupplier() {
   return await prisma.supplier.upsert({
@@ -47,30 +45,32 @@ async function ensureSupplier() {
   });
 }
 
-// Función para obtener las reglas desde la BD
 async function getPriceRules() {
   const rules = await prisma.priceRule.findMany({
     orderBy: { minUsd: "asc" },
   });
-  return rules.map(r => ({
+
+  return rules.map((r) => ({
     min: r.minUsd,
     max: r.maxUsd,
     multiplier: r.multiplier,
   }));
 }
 
-// Función para obtener el tipo de cambio guardado
 async function getExchangeRate() {
   const setting = await prisma.setting.findUnique({
     where: { key: "exchange_rate" },
   });
   return setting ? parseFloat(setting.value) : 1200;
 }
+
 async function ensureNovedadesCategory() {
   const novedadesSlug = "novedades";
+
   let category = await prisma.category.findUnique({
     where: { slug: novedadesSlug },
   });
+
   if (!category) {
     category = await prisma.category.create({
       data: {
@@ -82,6 +82,7 @@ async function ensureNovedadesCategory() {
     });
     console.log("✅ Categoría 'Novedades' creada automáticamente");
   }
+
   return category;
 }
 
@@ -90,10 +91,14 @@ function calculateFinalPriceInCents(
   exchangeRate: number,
   rules: { min: number; max: number; multiplier: number }[]
 ): number {
-  const rule = rules.find(r => supplierPriceInUSD >= r.min && supplierPriceInUSD <= r.max);
+  const rule = rules.find(
+    (r) => supplierPriceInUSD >= r.min && supplierPriceInUSD <= r.max
+  );
+
   const multiplier = rule ? rule.multiplier : 1.5;
   const priceInARS = supplierPriceInUSD * exchangeRate;
   const finalPrice = priceInARS * multiplier;
+
   return Math.round(finalPrice * 100);
 }
 
@@ -101,6 +106,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
     let exchangeRate = body.exchangeRate;
+
     if (!exchangeRate) {
       exchangeRate = await getExchangeRate();
     }
@@ -115,43 +121,23 @@ export async function POST(req: Request) {
     const rows = data.products;
 
     if (!rows.length) {
-      return NextResponse.json({ ok: true, done: true, count: 0, results: [] });
+      return NextResponse.json({
+        ok: true,
+        done: true,
+        count: 0,
+        results: [],
+      });
     }
 
     const results = [];
 
     for (const row of rows) {
-      // --- SupplierProduct ---
-      const supplierProduct = await prisma.supplierProduct.upsert({
-        where: {
-          supplierId_externalSku: {
-            supplierId: supplier.id,
-            externalSku: row.externalSku,
-          },
-        },
-        update: { name: row.name, lastSyncAt: new Date() },
-        create: {
-          supplierId: supplier.id,
-          externalId: row.externalId,
-          externalSku: row.externalSku,
-          name: row.name,
-          lastSyncAt: new Date(),
-        },
-      });
-
       // --- Producto interno ---
       let product = await prisma.product.findUnique({
         where: { slug: `sur-${row.externalSku}` },
       });
 
-      if (!product && supplierProduct.productId) {
-        product = await prisma.product.findUnique({
-          where: { id: supplierProduct.productId },
-        });
-      }
-
       if (!product) {
-        // Producto nuevo: se crea con nombre y descripción del proveedor
         const friendlySlug = await getUniqueSlug(row.name);
         product = await prisma.product.create({
           data: {
@@ -160,24 +146,19 @@ export async function POST(req: Request) {
             description: row.description || null,
             active: true,
             categories: {
-              connect :[{ id: novedadesCategory.id }],
+              connect: [{ id: novedadesCategory.id }],
             },
           },
         });
-      } else {
-        // Producto existente: no actualizamos nombre ni descripción para conservar personalizaciones
-        // (no se ejecuta ningún update)
       }
-
-      await prisma.supplierProduct.update({
-        where: { id: supplierProduct.id },
-        data: { productId: product.id },
-      });
 
       // --- Variantes ---
       for (const varRow of row.variants) {
         let variant = await prisma.productVariant.findFirst({
-          where: { sku: varRow.sku, productId: product.id },
+          where: {
+            sku: varRow.sku,
+            productId: product.id,
+          },
         });
 
         const finalPriceCents = calculateFinalPriceInCents(
@@ -190,60 +171,81 @@ export async function POST(req: Request) {
         const colorHex = varRow.color?.hexCode || null;
 
         if (!variant) {
-  // Variante nueva: usamos la imagen original del proveedor a través de Cloudinary fetch
-  let mainImageUrl = null;
-  if (varRow.images.original) {
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    if (cloudName) {
-      const encodedUrl = encodeURIComponent(varRow.images.original);
-      mainImageUrl = `https://res.cloudinary.com/${cloudName}/image/fetch/${encodedUrl}`;
-    } else {
-      // Fallback: usar la URL original directamente
-      mainImageUrl = varRow.images.original;
-    }
-  }
+          let mainImageUrl: string | null = null;
 
-  variant = await prisma.productVariant.create({
-    data: {
-      productId: product.id,
-      sku: varRow.sku,
-      colorName,
-      colorHex,
-      stock: varRow.stock,
-      priceOverride: finalPriceCents,
-    },
-  });
+          if (varRow.images.original) {
+            const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+            if (cloudName) {
+              const encodedUrl = encodeURIComponent(varRow.images.original);
+              mainImageUrl = `https://res.cloudinary.com/${cloudName}/image/fetch/${encodedUrl}`;
+            } else {
+              mainImageUrl = varRow.images.original;
+            }
+          }
 
-  // Guardar imagen principal si se pudo obtener una URL
-  if (mainImageUrl) {
-    await prisma.productImage.create({
-      data: {
-        productId: product.id,
-        variantId: variant.id,
-        url: mainImageUrl,
-        alt: row.name,
-        sort: 0,
-      },
-    });
-  }
-} else {
-          // Variante existente: solo actualizamos stock, precio y colores (sin tocar imagen)
+          variant = await prisma.productVariant.create({
+            data: {
+              productId: product.id,
+              sku: varRow.sku,
+              colorName,
+              colorHex,
+              stock: 0, // ✅ stock propio
+              priceOverride: finalPriceCents,
+              externalVariantId: varRow.sku, // ✅ usamos SKU externo de la variante
+            },
+          });
+
+          if (mainImageUrl) {
+            await prisma.productImage.create({
+              data: {
+                productId: product.id,
+                variantId: variant.id,
+                url: mainImageUrl,
+                alt: `${row.name} - ${colorName}`,
+                sort: 0,
+              },
+            });
+          }
+        } else {
           await prisma.productVariant.update({
             where: { id: variant.id },
             data: {
-              stock: varRow.stock,
               colorName,
               colorHex,
               priceOverride: finalPriceCents,
+              externalVariantId: varRow.sku, // ✅ usamos SKU externo
             },
           });
-          // No se sube imagen nueva ni se actualiza ProductImage
         }
 
-        // Vincular SupplierProduct con la variante
-        await prisma.supplierProduct.update({
-          where: { id: supplierProduct.id },
-          data: { variantId: variant.id },
+        // ✅ cada variante externa se mapea por su propio SKU
+        await prisma.supplierProduct.upsert({
+          where: {
+            supplierId_externalSku: {
+              supplierId: supplier.id,
+              externalSku: varRow.sku,
+            },
+          },
+          update: {
+            productId: product.id,
+            variantId: variant.id,
+            externalId: row.externalId,
+            name: `${row.name} - ${colorName}`,
+            supplierStock: varRow.stock,
+            supplierPrice: finalPriceCents,
+            lastSyncAt: new Date(),
+          },
+          create: {
+            supplierId: supplier.id,
+            productId: product.id,
+            variantId: variant.id,
+            externalId: row.externalId,
+            externalSku: varRow.sku,
+            name: `${row.name} - ${colorName}`,
+            supplierStock: varRow.stock,
+            supplierPrice: finalPriceCents,
+            lastSyncAt: new Date(),
+          },
         });
       }
 
@@ -255,11 +257,20 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({ ok: true, total: rows.length, results });
+    return NextResponse.json({
+      ok: true,
+      total: rows.length,
+      results,
+    });
   } catch (error: any) {
     console.error("Error en sync StockSur:", error);
+
     return NextResponse.json(
-      { ok: false, error: error.message || "Error interno", results: [] },
+      {
+        ok: false,
+        error: error.message || "Error interno",
+        results: [],
+      },
       { status: 500 }
     );
   }

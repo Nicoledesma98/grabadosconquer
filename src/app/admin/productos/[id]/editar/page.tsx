@@ -37,9 +37,12 @@ type ProductDTO = {
   description: string | null;
   basePrice: number | null;
   baseUsdPrice: string | number | null;
-  stock: number | null; 
+  stock: number | null;
   active: boolean;
   minQtyStep?: number;
+  minPurchaseQty?: number;
+  discountActive?: boolean;
+  discountPercent?: number;
   images: { id: string; url: string; alt: string | null; sort: number }[];
   categories: { id: string; name: string; slug: string }[];
   priceTiers: { id: string; minQty: number; price: number }[];
@@ -65,7 +68,12 @@ export default function AdminEditarProductoPage() {
   const [stock, setStock] = useState<string>("");
   const [active, setActive] = useState(true);
   const [minQtyStep, setMinQtyStep] = useState<number>(1);
-  const [allowedMethods, setAllowedMethods] = useState<PersonalizationMethod[]>([]);
+  const [minPurchaseQty, setMinPurchaseQty] = useState<number>(1);
+  const [allowedMethods, setAllowedMethods] = useState<PersonalizationMethod[]>(
+    [],
+  );
+  const [discountActive, setDiscountActive] = useState(false);
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
 
   // Categorías
   const [categories, setCategories] = useState<Category[]>([]);
@@ -82,7 +90,9 @@ export default function AdminEditarProductoPage() {
   const [tierPrice, setTierPrice] = useState("");
 
   // UI
-  const [activeTab, setActiveTab] = useState<"info" | "images" | "variants" | "pricing">("info");
+  const [activeTab, setActiveTab] = useState<
+    "info" | "images" | "variants" | "pricing"
+  >("info");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
@@ -113,6 +123,9 @@ export default function AdminEditarProductoPage() {
         setStock(p.stock == null ? "" : String(p.stock));
         setActive(p.active);
         setMinQtyStep(p.minQtyStep ?? 1);
+        setMinPurchaseQty(p.minPurchaseQty ?? 1);
+        setDiscountActive(p.discountActive ?? false);
+        setDiscountPercent(p.discountPercent ?? 0);
         setAllowedMethods(p.allowedMethods ?? []);
         setCategoryIds(p.categories.map((x) => x.id));
         setCategories(cats);
@@ -140,15 +153,16 @@ export default function AdminEditarProductoPage() {
       newErrors.slug = "Solo letras, números y guiones";
 
     if (!product?.isSupplierProduct) {
-  if (baseUsdPrice === "") {
-    newErrors.baseUsdPrice = "El costo base en USD es requerido";
-  } else {
-    const priceNum = Number(baseUsdPrice);
-    if (isNaN(priceNum) || priceNum < 0) {
-      newErrors.baseUsdPrice = "Ingrese un valor en USD válido (mayor o igual a 0)";
+      if (baseUsdPrice === "") {
+        newErrors.baseUsdPrice = "El costo base en USD es requerido";
+      } else {
+        const priceNum = Number(baseUsdPrice);
+        if (isNaN(priceNum) || priceNum < 0) {
+          newErrors.baseUsdPrice =
+            "Ingrese un valor en USD válido (mayor o igual a 0)";
+        }
+      }
     }
-  }
-}
 
     // Stock: solo validar si no tiene variantes
     if (!hasVariants) {
@@ -172,19 +186,24 @@ export default function AdminEditarProductoPage() {
     if (!validateForm()) return;
 
     setSaving(true);
-const stockToSend = (hasVariants || product?.isSupplierProduct) ? null : (stock ? Number(stock) : null);
-  console.log("hasVariants:", hasVariants, "stockToSend:", stockToSend);
-  console.log("Enviando datos:", {
-  name,
-  slug,
-  description,
-  baseUsdPrice,
-  stock: stockToSend,
-  active,
-  categoryIds,
-  allowedMethods,
-  minQtyStep,
-});
+    const stockToSend =
+      hasVariants || product?.isSupplierProduct
+        ? null
+        : stock
+          ? Number(stock)
+          : null;
+    console.log("hasVariants:", hasVariants, "stockToSend:", stockToSend);
+    console.log("Enviando datos:", {
+      name,
+      slug,
+      description,
+      baseUsdPrice,
+      stock: stockToSend,
+      active,
+      categoryIds,
+      allowedMethods,
+      minQtyStep,
+    });
     try {
       const res = await fetch(`/api/admin/products/${id}`, {
         method: "PATCH",
@@ -199,6 +218,9 @@ const stockToSend = (hasVariants || product?.isSupplierProduct) ? null : (stock 
           categoryIds,
           allowedMethods,
           minQtyStep,
+          minPurchaseQty,
+          discountActive,
+          discountPercent,
         }),
       });
 
@@ -221,11 +243,17 @@ const stockToSend = (hasVariants || product?.isSupplierProduct) ? null : (stock 
 
   // Eliminar producto
   async function onDelete() {
-    if (!confirm("¿Seguro que querés ELIMINAR este producto? Esta acción no se puede deshacer."))
+    if (
+      !confirm(
+        "¿Seguro que querés ELIMINAR este producto? Esta acción no se puede deshacer.",
+      )
+    )
       return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/products/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/products/${id}`, {
+        method: "DELETE",
+      });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         alert(payload?.error || "No se pudo borrar");
@@ -239,56 +267,56 @@ const stockToSend = (hasVariants || product?.isSupplierProduct) ? null : (stock 
   }
 
   // Funciones para imágenes, tiers, etc.
-async function uploadToCloudinary() {
-  if (uploadFiles.length === 0) return alert("Elegí al menos una imagen");
-  setUploading(true);
+  async function uploadToCloudinary() {
+    if (uploadFiles.length === 0) return alert("Elegí al menos una imagen");
+    setUploading(true);
 
-  try {
-    const signRes = await fetch("/api/cloudinary/sign", { method: "POST" });
-    const signed = await signRes.json();
+    try {
+      const signRes = await fetch("/api/cloudinary/sign", { method: "POST" });
+      const signed = await signRes.json();
 
-    for (const file of uploadFiles) {
-      const form = new FormData();
-      form.append("file", file);
-      form.append("api_key", signed.apiKey);
-      form.append("timestamp", String(signed.timestamp));
-      form.append("signature", signed.signature);
-      form.append("folder", signed.folder);
+      for (const file of uploadFiles) {
+        const form = new FormData();
+        form.append("file", file);
+        form.append("api_key", signed.apiKey);
+        form.append("timestamp", String(signed.timestamp));
+        form.append("signature", signed.signature);
+        form.append("folder", signed.folder);
 
-      const cloudRes = await fetch(
-        `https://api.cloudinary.com/v1_1/${signed.cloudName}/auto/upload`,
-        { method: "POST", body: form }
-      );
+        const cloudRes = await fetch(
+          `https://api.cloudinary.com/v1_1/${signed.cloudName}/auto/upload`,
+          { method: "POST", body: form },
+        );
 
-      const uploaded = await cloudRes.json();
-      if (!cloudRes.ok || !uploaded?.secure_url) {
-        throw new Error(`Error subiendo ${file.name} a Cloudinary`);
+        const uploaded = await cloudRes.json();
+        if (!cloudRes.ok || !uploaded?.secure_url) {
+          throw new Error(`Error subiendo ${file.name} a Cloudinary`);
+        }
+
+        const saveRes = await fetch(`/api/admin/products/${id}/images`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: uploaded.secure_url,
+            alt: name,
+          }),
+        });
+
+        if (!saveRes.ok) {
+          throw new Error(`No se pudo guardar la imagen ${file.name}`);
+        }
       }
 
-      const saveRes = await fetch(`/api/admin/products/${id}/images`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: uploaded.secure_url,
-          alt: name,
-        }),
-      });
-
-      if (!saveRes.ok) {
-        throw new Error(`No se pudo guardar la imagen ${file.name}`);
-      }
+      setUploadFiles([]);
+      await refreshProduct();
+      alert("Imágenes subidas ✅");
+    } catch (error) {
+      console.error(error);
+      alert("Error subiendo imágenes");
+    } finally {
+      setUploading(false);
     }
-
-    setUploadFiles([]);
-    await refreshProduct();
-    alert("Imágenes subidas ✅");
-  } catch (error) {
-    console.error(error);
-    alert("Error subiendo imágenes");
-  } finally {
-    setUploading(false);
   }
-}
 
   async function setPrimary(imageId: string) {
     const res = await fetch(`/api/admin/products/${id}/images`, {
@@ -301,9 +329,12 @@ async function uploadToCloudinary() {
 
   async function deleteImage(imageId: string) {
     if (!confirm("¿Eliminar esta imagen?")) return;
-    const res = await fetch(`/api/admin/products/${id}/images?imageId=${imageId}`, {
-      method: "DELETE",
-    });
+    const res = await fetch(
+      `/api/admin/products/${id}/images?imageId=${imageId}`,
+      {
+        method: "DELETE",
+      },
+    );
     if (res.ok) await refreshProduct();
   }
 
@@ -325,40 +356,46 @@ async function uploadToCloudinary() {
 
   async function deleteTier(tierId: string) {
     if (!confirm("¿Eliminar este tier?")) return;
-    const res = await fetch(`/api/admin/products/${id}/tiers?tierId=${tierId}`, {
-      method: "DELETE",
-    });
+    const res = await fetch(
+      `/api/admin/products/${id}/tiers?tierId=${tierId}`,
+      {
+        method: "DELETE",
+      },
+    );
     if (res.ok) await refreshProduct();
   }
 
   async function refreshProduct() {
-  const pRes = await fetch(`/api/admin/products/${id}`);
-  const p = (await pRes.json()) as ProductDTO;
+    const pRes = await fetch(`/api/admin/products/${id}`);
+    const p = (await pRes.json()) as ProductDTO;
 
-  setProduct(p);
-  setName(p.name);
-  setSlug(p.slug);
-  setDescription(p.description ?? "");
-  setBaseUsdPrice(p.baseUsdPrice == null ? "" : String(p.baseUsdPrice));
-  setStock(p.stock == null ? "" : String(p.stock));
-  setActive(p.active);
-  setMinQtyStep(p.minQtyStep ?? 1);
-  setAllowedMethods(p.allowedMethods ?? []);
-  setCategoryIds(p.categories.map((x) => x.id));
+    setProduct(p);
+    setName(p.name);
+    setSlug(p.slug);
+    setDescription(p.description ?? "");
+    setBaseUsdPrice(p.baseUsdPrice == null ? "" : String(p.baseUsdPrice));
+    setStock(p.stock == null ? "" : String(p.stock));
+    setActive(p.active);
+    setMinQtyStep(p.minQtyStep ?? 1);
+    setMinPurchaseQty(p.minPurchaseQty ?? 1);
+    setDiscountActive(p.discountActive ?? false);
+    setDiscountPercent(p.discountPercent ?? 0);
+    setAllowedMethods(p.allowedMethods ?? []);
+    setCategoryIds(p.categories.map((x) => x.id));
 
-  console.log("Producto cargado:", p);
-  console.log("Variantes:", p.variants);
-}
+    console.log("Producto cargado:", p);
+    console.log("Variantes:", p.variants);
+  }
 
   function toggleCategory(catId: string) {
     setCategoryIds((prev) =>
-      prev.includes(catId) ? prev.filter((x) => x !== catId) : [...prev, catId]
+      prev.includes(catId) ? prev.filter((x) => x !== catId) : [...prev, catId],
     );
   }
 
   function toggleMethod(m: PersonalizationMethod) {
     setAllowedMethods((prev) =>
-      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]
+      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m],
     );
   }
 
@@ -384,7 +421,9 @@ async function uploadToCloudinary() {
       {/* Cabecera */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-conquer-navy">Editar producto</h1>
+          <h1 className="text-2xl font-bold text-conquer-navy">
+            Editar producto
+          </h1>
           <p className="text-sm text-neutral-500">ID: {product.id}</p>
         </div>
         <button
@@ -496,35 +535,38 @@ async function uploadToCloudinary() {
               {/* Precio base */}
               {!product?.isSupplierProduct && (
                 <div className="space-y-2">
-  <label className="flex items-center gap-1 text-sm font-medium text-conquer-navy">
-    <DollarSign className="h-4 w-4" />
-    Costo base en USD *
-  </label>
-  <div className="relative">
-    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">USD</span>
-    <input
-      className={`h-11 w-full rounded-2xl border pl-14 pr-4 outline-none transition-all focus:ring-2 ${
-        touched.baseUsdPrice && errors.baseUsdPrice
-          ? "border-red-500 focus:border-red-500 focus:ring-red-200"
-          : "border-conquer-pink/30 focus:border-conquer-orange focus:ring-conquer-orange/20"
-      }`}
-      value={baseUsdPrice}
-      onChange={(e) => setBaseUsdPrice(e.target.value)}
-      onBlur={() => handleBlur("baseUsdPrice")}
-      inputMode="decimal"
-      placeholder="0.22"
-    />
-  </div>
-  {touched.baseUsdPrice && errors.baseUsdPrice && (
-    <p className="flex items-center gap-1 text-xs text-red-500">
-      <AlertCircle className="h-3 w-3" />
-      {errors.baseUsdPrice}
-    </p>
-  )}
-  <p className="text-xs text-neutral-500">
-    El precio final en pesos se recalcula automáticamente según el dólar configurado y las reglas.
-  </p>
-</div>
+                  <label className="flex items-center gap-1 text-sm font-medium text-conquer-navy">
+                    <DollarSign className="h-4 w-4" />
+                    Costo base en USD *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
+                      USD
+                    </span>
+                    <input
+                      className={`h-11 w-full rounded-2xl border pl-14 pr-4 outline-none transition-all focus:ring-2 ${
+                        touched.baseUsdPrice && errors.baseUsdPrice
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                          : "border-conquer-pink/30 focus:border-conquer-orange focus:ring-conquer-orange/20"
+                      }`}
+                      value={baseUsdPrice}
+                      onChange={(e) => setBaseUsdPrice(e.target.value)}
+                      onBlur={() => handleBlur("baseUsdPrice")}
+                      inputMode="decimal"
+                      placeholder="0.22"
+                    />
+                  </div>
+                  {touched.baseUsdPrice && errors.baseUsdPrice && (
+                    <p className="flex items-center gap-1 text-xs text-red-500">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.baseUsdPrice}
+                    </p>
+                  )}
+                  <p className="text-xs text-neutral-500">
+                    El precio final en pesos se recalcula automáticamente según
+                    el dólar configurado y las reglas.
+                  </p>
+                </div>
               )}
 
               {/* Stock - solo si no tiene variantes */}
@@ -553,27 +595,97 @@ async function uploadToCloudinary() {
                     </p>
                   )}
                   <p className="text-xs text-neutral-500">
-                    Este producto no tiene variantes, el stock se maneja globalmente.
+                    Este producto no tiene variantes, el stock se maneja
+                    globalmente.
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Múltiplos de compra */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-1 text-sm font-medium text-conquer-navy">
-                <Layers className="h-4 w-4" />
-                Múltiplos de compra
+            {/* Minimo de compra y Múltiplos de compra */}
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="flex items-center gap-1 text-sm font-medium text-conquer-navy">
+                  Compra mínima
+                </label>
+                <select
+                  className="h-11 w-full rounded-2xl border border-conquer-pink/30 bg-white px-4 outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
+                  value={minPurchaseQty}
+                  onChange={(e) => setMinPurchaseQty(Number(e.target.value))}
+                >
+                  <option value="1">1 unidad</option>
+                  <option value="10">10 unidades</option>
+                  <option value="25">25 unidades</option>
+                  <option value="50">50 unidades</option>
+                  <option value="75">75 unidades</option>
+                  <option value="100">100 unidades</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="flex items-center gap-1 text-sm font-medium text-conquer-navy">
+                  Múltiplos de compra
+                </label>
+                <select
+                  className="h-11 w-full rounded-2xl border border-conquer-pink/30 bg-white px-4 outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
+                  value={minQtyStep}
+                  onChange={(e) => setMinQtyStep(Number(e.target.value))}
+                >
+                  <option value="1">Sin múltiplos (1 en 1)</option>
+                  <option value="5">Solo múltiplos de 5</option>
+                  <option value="10">Solo múltiplos de 10</option>
+                </select>
+              </div>
+            </div>
+            <div className="space-y-3 rounded-2xl border border-conquer-pink/30 bg-conquer-pink/5 p-4">
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={discountActive}
+                  onChange={(e) => {
+                    setDiscountActive(e.target.checked);
+                    if (!e.target.checked) setDiscountPercent(0);
+                  }}
+                  className="h-5 w-5 rounded border-conquer-pink/30 text-conquer-orange focus:ring-conquer-orange/20"
+                />
+                <div>
+                  <span className="text-sm font-medium text-conquer-navy">
+                    Aplicar descuento al producto
+                  </span>
+                  <p className="text-xs text-neutral-500">
+                    Mostrará badge de oferta y aplicará descuento sobre el
+                    precio visible.
+                  </p>
+                </div>
               </label>
-              <select
-                className="h-11 w-full rounded-2xl border border-conquer-pink/30 bg-white px-4 outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
-                value={minQtyStep}
-                onChange={(e) => setMinQtyStep(Number(e.target.value))}
-              >
-                <option value="1">Sin múltiplos (1 en 1)</option>
-                <option value="5">Solo múltiplos de 5</option>
-                <option value="10">Solo múltiplos de 10</option>
-              </select>
+
+              {discountActive && (
+                <div className="space-y-2">
+                  <label className="flex items-center gap-1 text-sm font-medium text-conquer-navy">
+                    Porcentaje de descuento
+                  </label>
+                  <div className="relative max-w-xs">
+                    <input
+                      type="number"
+                      min={1}
+                      max={90}
+                      value={discountPercent}
+                      onChange={(e) => {
+                        const value = Number(e.target.value || 0);
+                        setDiscountPercent(Math.max(0, Math.min(90, value)));
+                      }}
+                      className="h-11 w-full rounded-2xl border border-conquer-pink/30 px-4 pr-10 outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-neutral-500">
+                      %
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-neutral-500">
+                    Permitido entre 1% y 90%.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Categorías */}
@@ -614,7 +726,11 @@ async function uploadToCloudinary() {
                 {(["DTF", "DTG", "FULL_COLOR", "LASER"] as const).map((m) => {
                   const isSelected = allowedMethods.includes(m);
                   const label =
-                    m === "FULL_COLOR" ? "Full color" : m === "LASER" ? "Láser" : m;
+                    m === "FULL_COLOR"
+                      ? "Full color"
+                      : m === "LASER"
+                        ? "Láser"
+                        : m;
                   return (
                     <button
                       key={m}
@@ -646,7 +762,9 @@ async function uploadToCloudinary() {
                 className="h-5 w-5 rounded border-conquer-pink/30 text-conquer-orange focus:ring-conquer-orange/20"
               />
               <div>
-                <span className="text-sm font-medium text-conquer-navy">Producto activo</span>
+                <span className="text-sm font-medium text-conquer-navy">
+                  Producto activo
+                </span>
                 <p className="text-xs text-neutral-500">
                   Si está inactivo, no aparecerá en la tienda.
                 </p>
@@ -734,13 +852,17 @@ async function uploadToCloudinary() {
                   type="file"
                   accept="image/*"
                   multiple
-                  onChange={(e) => setUploadFiles(Array.from(e.target.files ?? []))}
+                  onChange={(e) =>
+                    setUploadFiles(Array.from(e.target.files ?? []))
+                  }
                   className="flex-1 rounded-full border border-conquer-pink/30 bg-white px-4 py-2 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-conquer-orange file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-conquer-orange/90"
                 />
                 {uploadFiles.length > 0 && (
-                <p className="text-xs text-neutral-600">
-                {uploadFiles.length} imagen{uploadFiles.length > 1 ? "es" : ""} seleccionada{uploadFiles.length > 1 ? "s" : ""}
-                </p>
+                  <p className="text-xs text-neutral-600">
+                    {uploadFiles.length} imagen
+                    {uploadFiles.length > 1 ? "es" : ""} seleccionada
+                    {uploadFiles.length > 1 ? "s" : ""}
+                  </p>
                 )}
                 <button
                   type="button"
@@ -776,7 +898,8 @@ async function uploadToCloudinary() {
             {hasVariants && (
               <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">
                 <AlertCircle className="mr-2 inline h-4 w-4" />
-                Este producto tiene variantes. El stock se maneja por variante, no globalmente.
+                Este producto tiene variantes. El stock se maneja por variante,
+                no globalmente.
               </div>
             )}
           </div>
@@ -793,7 +916,9 @@ async function uploadToCloudinary() {
             {product.priceTiers.length === 0 ? (
               <div className="rounded-2xl border-2 border-dashed border-conquer-pink/30 bg-conquer-pink/5 p-8 text-center">
                 <Tag className="mx-auto h-10 w-10 text-conquer-pink/40" />
-                <p className="mt-2 text-sm text-neutral-600">No hay precios por cantidad</p>
+                <p className="mt-2 text-sm text-neutral-600">
+                  No hay precios por cantidad
+                </p>
               </div>
             ) : (
               <div className="grid gap-3">
@@ -824,7 +949,9 @@ async function uploadToCloudinary() {
             )}
 
             <div className="rounded-2xl border border-conquer-pink/30 bg-conquer-pink/5 p-5">
-              <h4 className="mb-3 text-sm font-semibold text-conquer-navy">Agregar nuevo tier</h4>
+              <h4 className="mb-3 text-sm font-semibold text-conquer-navy">
+                Agregar nuevo tier
+              </h4>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-neutral-500">

@@ -93,7 +93,8 @@ export default function CarritoPage() {
             // Stock disponible (si está en el item)
             const stock = (item as any).stock;
             const hasStock = stock === undefined || stock === null || stock > 0;
-
+            const hasDiscount = Number(item.discountPercent ?? 0) > 0 && Number(item.originalUnitPrice ?? 0) > Number(item.unitPrice ?? 0);
+            const originalUnitPrice = Number(item.originalUnitPrice ?? 0);
             return (
               <div
                 key={key}
@@ -151,14 +152,29 @@ export default function CarritoPage() {
                         )}
                       </div>
 
-                      {/* Precio unitario */}
                       <div className="text-right">
-                        <span className="text-sm text-neutral-500">Unitario</span>
-                        <div className="text-lg font-bold text-conquer-orange">
-                          {formatARS(item.unitPrice)}
-                        </div>
-                        <span className="text-[10px] text-neutral-500">+ IVA</span>
-                      </div>
+  <span className="text-sm text-neutral-500">Unitario</span>
+
+  {hasDiscount && (
+    <div className="text-xs text-neutral-400 line-through">
+      {formatARS(originalUnitPrice)}
+    </div>
+  )}
+
+  <div className="flex flex-col items-end">
+    <div className="text-lg font-bold text-conquer-orange">
+      {formatARS(item.unitPrice)}
+    </div>
+
+    {hasDiscount && (
+      <span className="mt-1 rounded-full bg-conquer-turq px-2 py-0.5 text-[10px] font-bold text-conquer-navy">
+        OFERTA -{item.discountPercent}%
+      </span>
+    )}
+  </div>
+
+  <span className="text-[10px] text-neutral-500">+ IVA</span>
+</div>
                     </div>
 
                     {/* Stock warning */}

@@ -3,7 +3,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { formatARS } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Sparkles, Package, Search, Tag } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  Package,
+  Search,
+  Tag,
+} from "lucide-react";
 import ProductFilters from "./components/ProductFilters";
 
 export const runtime = "nodejs";
@@ -37,89 +44,139 @@ export default async function ProductosPage({
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   const cat = typeof sp.cat === "string" ? sp.cat.trim() : "";
   const sort = typeof sp.sort === "string" ? sp.sort : "newest";
-  const minPrice = typeof sp.minPrice === "string" ? parseInt(sp.minPrice, 10) : undefined;
-  const maxPrice = typeof sp.maxPrice === "string" ? parseInt(sp.maxPrice, 10) : undefined;
+  const minPrice =
+    typeof sp.minPrice === "string" ? parseInt(sp.minPrice, 10) : undefined;
+  const maxPrice =
+    typeof sp.maxPrice === "string" ? parseInt(sp.maxPrice, 10) : undefined;
   const inStock = sp.inStock === "true";
   const pageRaw = typeof sp.page === "string" ? Number(sp.page) : 1;
 
   // Obtener todas las categorías para el filtro lateral
-  const allCategories = await prisma.category.findMany({
-    where: { active: true }, // si tienes campo active en categorías
-    orderBy: { name: "asc" },
-    select: { id: true, name: true, slug: true },
-  });
+const allCategories = await prisma.category.findMany({
+  where: { active: true },
+  orderBy: { name: "asc" },
+  select: {
+    id: true,
+    name: true,
+    slug: true,
+    parentId: true,
+    children: {
+      where: { active: true },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        parentId: true,
+      },
+    },
+  },
+});
 
   // Construir filtro WHERE
-  const where: any = {
-    active: true,
-    ...(q && {
-      OR: [
-        { name: { contains: q, mode: "insensitive" } },
-        { slug: { contains: q, mode: "insensitive" } },
-        { description: { contains: q, mode: "insensitive" } },
-      ],
-    }),
-    ...(cat && { categories: { some: { slug: cat } } }),
-  };
 
-// Filtro por precio
-if (minPrice !== undefined || maxPrice !== undefined) {
-  // Condiciones para productos manuales (basePrice o priceTiers)
-  const manualConditions: any[] = [];
-  if (minPrice !== undefined) {
-    manualConditions.push({
-      OR: [
-        { basePrice: { gte: minPrice } },
-        { priceTiers: { some: { price: { gte: minPrice } } } },
-      ],
-    });
-  }
-  if (maxPrice !== undefined) {
-    manualConditions.push({
-      OR: [
-        { basePrice: { lte: maxPrice } },
-        { priceTiers: { some: { price: { lte: maxPrice } } } },
-      ],
-    });
-  }
+  let categoryFilter = {};
 
-  // Condiciones para productos de StockSur (variantes)
-  const variantConditions: any[] = [];
-  if (minPrice !== undefined) {
-    variantConditions.push({
-      variants: { some: { priceOverride: { gte: minPrice * 100 } } },
-    });
-  }
-  if (maxPrice !== undefined) {
-    variantConditions.push({
-      variants: { some: { priceOverride: { lte: maxPrice * 100 } } },
-    });
-  }
+if (cat) {
+  const selectedCategory = await prisma.category.findUnique({
+    where: { slug: cat },
+    select: {
+      id: true,
+      children: {
+        select: { id: true },
+      },
+    },
+  });
 
-  // Combinamos manual y variant con OR
-  if (manualConditions.length > 0 || variantConditions.length > 0) {
-    where.AND = []; // limpiamos cualquier AND anterior (si lo hubiera)
-    // Si ambos grupos tienen condiciones, los unimos con OR
-    if (manualConditions.length > 0 && variantConditions.length > 0) {
-      where.OR = [
-        { AND: manualConditions },
-        { AND: variantConditions },
-      ];
-    } else if (manualConditions.length > 0) {
-      where.AND = manualConditions;
-    } else if (variantConditions.length > 0) {
-      where.AND = variantConditions;
-    }
+  if (selectedCategory) {
+    const categoryIds = [
+      selectedCategory.id,
+      ...selectedCategory.children.map((c) => c.id),
+    ];
+
+    categoryFilter = {
+      categories: {
+        some: {
+          id: { in: categoryIds },
+        },
+      },
+    };
   }
 }
+ const where: any = {
+  active: true,
+  ...(q && {
+    OR: [
+      { name: { contains: q, mode: "insensitive" } },
+      { slug: { contains: q, mode: "insensitive" } },
+      { description: { contains: q, mode: "insensitive" } },
+    ],
+  }),
+  ...categoryFilter,
+};
 
-  // Filtro por stock
+  // Filtro por precio
+  if (minPrice !== undefined || maxPrice !== undefined) {
+    // Condiciones para productos manuales (basePrice o priceTiers)
+    const manualConditions: any[] = [];
+    if (minPrice !== undefined) {
+      manualConditions.push({
+        OR: [
+          { basePrice: { gte: minPrice } },
+          { priceTiers: { some: { price: { gte: minPrice } } } },
+        ],
+      });
+    }
+    if (maxPrice !== undefined) {
+      manualConditions.push({
+        OR: [
+          { basePrice: { lte: maxPrice } },
+          { priceTiers: { some: { price: { lte: maxPrice } } } },
+        ],
+      });
+    }
+
+    // Condiciones para productos de StockSur (variantes)
+    const variantConditions: any[] = [];
+    if (minPrice !== undefined) {
+      variantConditions.push({
+        variants: { some: { priceOverride: { gte: minPrice * 100 } } },
+      });
+    }
+    if (maxPrice !== undefined) {
+      variantConditions.push({
+        variants: { some: { priceOverride: { lte: maxPrice * 100 } } },
+      });
+    }
+
+    // Combinamos manual y variant con OR
+    if (manualConditions.length > 0 || variantConditions.length > 0) {
+      where.AND = []; // limpiamos cualquier AND anterior (si lo hubiera)
+      // Si ambos grupos tienen condiciones, los unimos con OR
+      if (manualConditions.length > 0 && variantConditions.length > 0) {
+        where.OR = [{ AND: manualConditions }, { AND: variantConditions }];
+      } else if (manualConditions.length > 0) {
+        where.AND = manualConditions;
+      } else if (variantConditions.length > 0) {
+        where.AND = variantConditions;
+      }
+    }
+  }
+
   if (inStock) {
-    where.OR = where.OR || [];
-    where.OR.push(
-      { variants: { some: { stock: { gt: 0 } } } },
-      { variants: { none: {} } }
-    );
+    where.AND = where.AND || [];
+    where.AND.push({
+      OR: [
+        { stock: { gt: 0 } }, // productos simples con stock propio
+        { supplierMap: { some: { supplierStock: { gt: 0 } } } }, // productos simples con stock proveedor
+        { variants: { some: { stock: { gt: 0 } } } }, // variantes con stock propio
+        {
+          variants: {
+            some: { supplierMaps: { some: { supplierStock: { gt: 0 } } } },
+          },
+        }, // variantes con stock proveedor
+      ],
+    });
   }
 
   // Ordenamiento
@@ -154,7 +211,21 @@ if (minPrice !== undefined || maxPrice !== undefined) {
       images: { orderBy: { sort: "asc" }, take: 1 },
       priceTiers: { orderBy: { minQty: "asc" } },
       categories: { orderBy: { name: "asc" } },
-      variants: { orderBy: { createdAt: "asc" } },
+      supplierMap: {
+        select: {
+          supplierStock: true,
+        },
+      },
+      variants: {
+        orderBy: { createdAt: "asc" },
+        include: {
+          supplierMaps: {
+            select: {
+              supplierStock: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -189,11 +260,13 @@ if (minPrice !== undefined || maxPrice !== undefined) {
     page: page < totalPages ? page + 1 : undefined,
   })}`;
 
-  const pageLinks = Array.from({ length: totalPages }, (_, i) => i + 1).filter((p) => {
-    if (p === 1 || p === totalPages) return true;
-    if (Math.abs(p - page) <= 2) return true;
-    return false;
-  });
+  const pageLinks = Array.from({ length: totalPages }, (_, i) => i + 1).filter(
+    (p) => {
+      if (p === 1 || p === totalPages) return true;
+      if (Math.abs(p - page) <= 2) return true;
+      return false;
+    },
+  );
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-white to-conquer-pink/5 py-8">
@@ -205,7 +278,8 @@ if (minPrice !== undefined || maxPrice !== undefined) {
               {cat ? categoryName : "Todos los productos"}
             </h1>
             <p className="mt-1 text-sm text-neutral-600">
-              {total} {total === 1 ? "producto encontrado" : "productos encontrados"}
+              {total}{" "}
+              {total === 1 ? "producto encontrado" : "productos encontrados"}
             </p>
           </div>
         </div>
@@ -214,8 +288,8 @@ if (minPrice !== undefined || maxPrice !== undefined) {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar de filtros */}
           <aside className="lg:w-64 flex-shrink-0">
-            <ProductFilters 
-              categories={allCategories} 
+            <ProductFilters
+              categories={allCategories}
               initialFilters={{ q, cat, sort, minPrice, maxPrice, inStock }}
             />
           </aside>
@@ -225,7 +299,9 @@ if (minPrice !== undefined || maxPrice !== undefined) {
             {/* Filtros activos (búsqueda, categoría) */}
             {(q || cat) && (
               <div className="mb-6 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-neutral-500">Filtros activos:</span>
+                <span className="text-xs font-medium text-neutral-500">
+                  Filtros activos:
+                </span>
                 {q && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-conquer-pink/20 px-3 py-1.5 text-xs text-conquer-navy">
                     <Search className="h-3 w-3" />
@@ -269,30 +345,57 @@ if (minPrice !== undefined || maxPrice !== undefined) {
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
                   {products.map((product) => {
                     const img = product.images[0]?.url;
-                    const isSurProduct = product.slug.startsWith('sur-');
-                    const isStockSurProduct = product.variants.length > 0 && product.priceTiers.length === 0 && product.basePrice === null;
 
-let priceDisplay;
-if (isStockSurProduct && product.variants.length > 0) {
-  const positivePrices = product.variants
-    .map(v => v.priceOverride ?? 0)
-    .filter(p => p > 0);
-  if (positivePrices.length > 0) {
-    const minPriceCents = Math.min(...positivePrices);
-    const minPriceARS = minPriceCents / 100;
-    priceDisplay = formatARS(minPriceARS);
-  } else {
-    priceDisplay = formatARS(0);
-  }
-} else {
-  const price = product.priceTiers[0]?.price ?? product.basePrice ?? 0;
-  priceDisplay = formatARS(price);
-}
+                    const variantPrices = product.variants
+                      .map((v) => v.priceOverride ?? 0)
+                      .filter((p) => p > 0);
+
+                    const baseVisiblePrice =
+                      variantPrices.length > 0
+                        ? Math.min(...variantPrices) / 100
+                        : (product.priceTiers[0]?.price ??
+                          product.basePrice ??
+                          0);
+
+                    const hasDiscount =
+                      product.discountActive === true &&
+                      (product.discountPercent ?? 0) > 0;
+
+                    const finalVisiblePrice = hasDiscount
+                      ? Math.round(
+                          baseVisiblePrice *
+                            (1 - (product.discountPercent ?? 0) / 100),
+                        )
+                      : baseVisiblePrice;
+
+                    let priceDisplay: string;
+
+                    if (variantPrices.length > 0) {
+                      const minPriceARS = Math.min(...variantPrices) / 100;
+                      priceDisplay = formatARS(minPriceARS);
+                    } else {
+                      const price =
+                        product.priceTiers[0]?.price ?? product.basePrice ?? 0;
+                      priceDisplay = formatARS(price);
+                    }
                     const isNew =
-                      new Date(product.createdAt).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000;
+                      new Date(product.createdAt).getTime() >
+                      Date.now() - 7 * 24 * 60 * 60 * 1000;
                     const hasStock =
-                      product.variants.length === 0 ||
-                      product.variants.some((v) => v.stock > 0);
+                      product.variants.length > 0
+                        ? product.variants.some((v) => {
+                            const supplierStock = v.supplierMaps.reduce(
+                              (sum, s) => sum + (s.supplierStock ?? 0),
+                              0,
+                            );
+                            return v.stock + supplierStock > 0;
+                          })
+                        : (product.stock ?? 0) +
+                            product.supplierMap.reduce(
+                              (sum, s) => sum + (s.supplierStock ?? 0),
+                              0,
+                            ) >
+                          0;
 
                     return (
                       <Link
@@ -300,12 +403,20 @@ if (isStockSurProduct && product.variants.length > 0) {
                         href={`/productos/${product.slug}`}
                         className="group relative overflow-hidden rounded-2xl border border-conquer-pink/30 bg-white p-4 transition-all duration-300 hover:scale-[1.02] hover:border-conquer-orange hover:shadow-xl"
                       >
-                        {isNew && (
-                          <span className="absolute left-3 top-3 z-10 flex items-center gap-1 rounded-full bg-conquer-orange px-3 py-1 text-xs font-bold text-white shadow-md">
-                            <Sparkles className="h-3 w-3" />
-                            NUEVO
-                          </span>
-                        )}
+                        <div className="absolute left-3 top-3 z-10 flex flex-col gap-2">
+                          {isNew && (
+                            <span className="flex items-center gap-1 rounded-full bg-conquer-orange px-3 py-1 text-xs font-bold text-white shadow-md">
+                              <Sparkles className="h-3 w-3" />
+                              NUEVO
+                            </span>
+                          )}
+
+                          {hasDiscount && (
+                            <span className="rounded-full border border-conquer-turq/40 bg-conquer-turq px-3 py-1 text-xs font-bold text-conquer-navy shadow-sm">
+                              OFERTA -{product.discountPercent}%
+                            </span>
+                          )}
+                        </div>
                         <div className="relative mb-3 aspect-square w-full overflow-hidden rounded-xl bg-white">
                           {img ? (
                             <Image
@@ -325,12 +436,26 @@ if (isStockSurProduct && product.variants.length > 0) {
                           <h3 className="line-clamp-2 text-sm font-semibold text-conquer-navy">
                             {product.name}
                           </h3>
-                          <div className="mt-2 flex items-baseline gap-1">
-                            <span className="text-xs text-neutral-500">Desde</span>
-                            <span className="text-lg font-bold text-conquer-orange">
-                              {priceDisplay}
-                            </span>
-                            <span className="text-xs text-neutral-500">+ IVA</span>
+                          <div className="mt-2">
+                            <div className="mt-2 space-y-1">
+                              {hasDiscount && (
+                                <div className="text-sm text-neutral-400 line-through">
+                                  Desde {formatARS(baseVisiblePrice)}
+                                </div>
+                              )}
+
+                              <div className="flex flex-wrap items-baseline gap-1">
+                                <span className="text-xs text-neutral-500">
+                                  Desde
+                                </span>
+                                <span className="text-2xl font-bold text-conquer-orange">
+                                  {formatARS(finalVisiblePrice)}
+                                </span>
+                                <span className="text-xs text-neutral-500">
+                                  + IVA
+                                </span>
+                              </div>
+                            </div>
                           </div>
                           <div className="mt-2 flex items-center gap-1">
                             <span
@@ -375,11 +500,16 @@ if (isStockSurProduct && product.variants.length > 0) {
                 {totalPages > 1 && (
                   <div className="mt-12 flex flex-col items-center gap-4">
                     <div className="text-sm text-neutral-600">
-                      Mostrando <span className="font-semibold">{(page - 1) * PAGE_SIZE + 1}</span> -{" "}
+                      Mostrando{" "}
+                      <span className="font-semibold">
+                        {(page - 1) * PAGE_SIZE + 1}
+                      </span>{" "}
+                      -{" "}
                       <span className="font-semibold">
                         {Math.min(page * PAGE_SIZE, total)}
                       </span>{" "}
-                      de <span className="font-semibold">{total}</span> productos
+                      de <span className="font-semibold">{total}</span>{" "}
+                      productos
                     </div>
                     <div className="flex flex-wrap items-center justify-center gap-2">
                       <Link
@@ -398,7 +528,9 @@ if (isStockSurProduct && product.variants.length > 0) {
                         const showDots = prev != null && p - prev > 1;
                         return (
                           <span key={p} className="flex items-center gap-1">
-                            {showDots && <span className="px-2 text-neutral-400">…</span>}
+                            {showDots && (
+                              <span className="px-2 text-neutral-400">…</span>
+                            )}
                             <Link
                               href={`/productos${buildQueryString({
                                 q,

@@ -1,19 +1,26 @@
+import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import FeaturedCarousel from "./FeaturedCarousel"; // ajustá la ruta según tu estructura
+import FeaturedCarousel from "./FeaturedCarousel";
 
 export const runtime = "nodejs";
 
 export default async function HomeFeatured() {
-  const products = await prisma.product.findMany({
+  const productsRaw = await prisma.product.findMany({
     where: { active: true },
     orderBy: { createdAt: "desc" },
     take: 8,
     include: {
       images: { orderBy: { sort: "asc" }, take: 1 },
       priceTiers: { orderBy: { minQty: "asc" } },
-      variants: true
+      variants: true,
     },
   });
+
+  const products = productsRaw.map((p) => ({
+    ...p,
+    baseUsdPrice: p.baseUsdPrice ? Number(p.baseUsdPrice) : null,
+  }));
 
   if (products.length === 0) return null;
 
@@ -36,6 +43,3 @@ export default async function HomeFeatured() {
     </section>
   );
 }
-
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";

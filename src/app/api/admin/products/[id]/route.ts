@@ -6,6 +6,13 @@ function normalizeMinQtyStep(v: any) {
   const n = Number(v);
   return [1, 5, 10].includes(n) ? n : 1;
 }
+function normalizeDiscountPercent(v: any) {
+  const n = Number(v);
+  if (!Number.isInteger(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 90) return 90;
+  return n;
+}
 
 function toSlug(input: string) {
   return input
@@ -13,6 +20,10 @@ function toSlug(input: string) {
     .trim()
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "");
+}
+function normalizeMinPurchaseQty(v: any) {
+  const n = Number(v);
+  return [1, 10, 25, 50, 75, 100].includes(n) ? n : 1;
 }
 
 const ALLOWED_METHODS = ["DTF", "DTG", "FULL_COLOR", "LASER"] as const;
@@ -136,9 +147,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const imageUrl = body.imageUrl ? String(body.imageUrl).trim() : "";
   const categoryIds: string[] = Array.isArray(body.categoryIds) ? body.categoryIds : [];
   const allowedMethods = normalizeAllowedMethods(body.allowedMethods);
-
+  const minPurchaseQty = normalizeMinPurchaseQty(body.minPurchaseQty ?? 1);
   if (!name) return Response.json({ error: "Name is required" }, { status: 400 });
-
+  const discountActive = body.discountActive === true;
+const discountPercent = discountActive
+  ? normalizeDiscountPercent(body.discountPercent ?? 0)
+  : 0;
   const slug = slugRaw ? toSlug(slugRaw) : toSlug(name);
   if (!slug) return Response.json({ error: "Invalid slug" }, { status: 400 });
 
@@ -147,7 +161,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return Response.json({ error: "Invalid baseUsdPrice" }, { status: 400 });
   }
   }
-  
+  if (discountActive && (discountPercent < 1 || discountPercent > 90)) {
+  return Response.json(
+    { error: "El descuento debe estar entre 1 y 90" },
+    { status: 400 }
+  );
+}
 
   const current = await prisma.product.findUnique({
     where: { id },
@@ -186,6 +205,9 @@ if (!isSupplierProduct) {
       name,
       slug,
       minQtyStep,
+      minPurchaseQty,
+      discountActive,
+      discountPercent,
       description,
       ...(isSupplierProduct
     ? {}

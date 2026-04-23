@@ -31,20 +31,69 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   const name = String(body?.name ?? "").trim();
   const slugRaw = String(body?.slug ?? "").trim();
+  const parentId = body?.parentId ? String(body.parentId) : null;
 
   if (!name) return Response.json({ error: "Name requerido" }, { status: 400 });
 
   const slug = slugRaw ? slugify(slugRaw) : slugify(name);
   if (!slug) return Response.json({ error: "Slug inválido" }, { status: 400 });
 
+  if (parentId === id) {
+    return Response.json(
+      { error: "Una categoría no puede ser hija de sí misma" },
+      { status: 400 }
+    );
+  }
+
+  if (parentId) {
+    const parent = await prisma.category.findUnique({
+      where: { id: parentId },
+      select: { id: true },
+    });
+
+    if (!parent) {
+      return Response.json({ error: "Categoría padre no encontrada" }, { status: 400 });
+    }
+  }
+
   try {
     const updated = await prisma.category.update({
       where: { id },
-      data: { name, slug, image: body.image || null },
+      data: {
+        name,
+        slug,
+        image: body.image || null,
+        parentId,
+      },
+      include: {
+        parent: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        children: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        _count: {
+          select: {
+            products: true,
+          },
+        },
+      },
     });
+
     return Response.json(updated);
   } catch {
-    return Response.json({ error: "No se pudo actualizar (¿slug duplicado?)" }, { status: 400 });
+    return Response.json(
+      { error: "No se pudo actualizar (¿slug duplicado?)" },
+      { status: 400 }
+    );
   }
 }
 
@@ -55,10 +104,12 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   const { id } = await ctx.params;
 
   try {
-    // Primero, verificar si la categoría existe y si tiene productos
     const category = await prisma.category.findUnique({
       where: { id },
-      include: { products: { select: { id: true }, take: 1 } }, // solo necesitamos saber si hay al menos uno
+      include: {
+        products: { select: { id: true }, take: 1 },
+        children: { select: { id: true }, take: 1 },
+      },
     });
 
     if (!category) {
@@ -72,7 +123,13 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
       );
     }
 
-    // Si no tiene productos, procedemos a eliminar
+    if (category.children.length > 0) {
+      return Response.json(
+        { error: "No se puede eliminar la categoría porque tiene subcategorías asociadas." },
+        { status: 400 }
+      );
+    }
+
     await prisma.category.delete({ where: { id } });
     return Response.json({ ok: true });
   } catch (error) {

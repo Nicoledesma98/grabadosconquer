@@ -7,12 +7,14 @@ type Category = {
   slug: string;
   name: string;
   image?: string | null;
+  parentId?: string | null;
 };
 
 export default function HomeCategories({ categories }: { categories: Category[] }) {
+  const rootCategories = categories.filter((cat) => !cat.parentId);
+
   return (
     <section className="mt-16">
-      {/* Cabecera */}
       <div className="mb-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-conquer-orange/10">
@@ -29,9 +31,8 @@ export default function HomeCategories({ categories }: { categories: Category[] 
         </Link>
       </div>
 
-      {/* Grid de categorías */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-        {categories.map((cat) => {
+        {rootCategories.map((cat) => {
           const imgSrc = cat.image || categoryImages[cat.slug] || defaultCategoryImage;
 
           return (

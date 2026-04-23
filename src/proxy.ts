@@ -8,13 +8,18 @@ const routePermissions: Record<string, string[]> = {
   "/admin": ["ADMIN"],
 
   // Subrutas específicas
-  "/admin/productos": ["ADMIN", "STOCK","VENTAS"],        // Stock puede gestionar productos
+  "/admin/productos": ["ADMIN", "STOCK","VENTAS"],       // Stock puede gestionar productos
+  "/admin/checkout-mp-test": ["ADMIN"],
   "/admin/pedidos": ["ADMIN", "VENTAS"],         // Ventas puede ver pedidos
   "/admin/usuarios": ["ADMIN"],                  // Solo ADMIN
   "/admin/proveedores": ["ADMIN"],               // Solo ADMIN
   "/admin/configuracion": ["ADMIN"],             // Solo ADMIN
   "/admin/dashboard": ["ADMIN", "VENTAS"],       // Dashboard (si lo creas)
-  // Agregá más rutas según necesites
+  "/admin/stock": ["ADMIN", "STOCK"],
+  "/admin/stock/movimientos" : ["ADMIN","STOCK"],
+  "/admin/stock/vincular" : ["ADMIN", "STOCK"],
+  "/admin/stock/ingresar" : ["ADMIN", "STOCK"],
+  "/admin/stock/sacar"  : ["ADMIN", "STOCK"],
 };
 
 // Función para obtener los roles permitidos para una ruta

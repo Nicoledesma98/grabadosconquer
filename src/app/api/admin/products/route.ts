@@ -9,12 +9,22 @@ function toSlug(input: string) {
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "");
 }
+function normalizeDiscountPercent(v: any) {
+  const n = Number(v);
+  if (!Number.isInteger(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 90) return 90;
+  return n;
+}
 
 function normalizeMinQtyStep(v: any) {
   const n = Number(v);
   return [1, 5, 10].includes(n) ? n : 1;
 }
-
+function normalizeMinPurchaseQty(v: any) {
+  const n = Number(v);
+  return [1, 10, 25, 50, 75, 100].includes(n) ? n : 1;
+}
 // Métodos válidos
 const ALLOWED_METHODS = ["DTF", "DTG", "FULL_COLOR", "LASER"] as const;
 type PersonalizationMethod = (typeof ALLOWED_METHODS)[number];
@@ -98,10 +108,14 @@ export async function POST(req: Request) {
   const allowedMethods = normalizeAllowedMethods(body.allowedMethods ?? []);
   const imageUrl = body.imageUrl ? String(body.imageUrl).trim() : "";
   const categoryIds: string[] = Array.isArray(body.categoryIds) ? body.categoryIds : [];
-
+  const minPurchaseQty = normalizeMinPurchaseQty(body.minPurchaseQty ?? 1);
   if (!name) {
     return Response.json({ error: "Name is required" }, { status: 400 });
   }
+  const discountActive = body.discountActive === true;
+const discountPercent = discountActive
+  ? normalizeDiscountPercent(body.discountPercent ?? 0)
+  : 0;
 
   const slug = slugRaw ? toSlug(slugRaw) : toSlug(name);
   if (!slug) {
@@ -111,7 +125,12 @@ export async function POST(req: Request) {
   if (baseUsdPrice == null || !Number.isFinite(baseUsdPrice) || baseUsdPrice < 0) {
     return Response.json({ error: "Invalid baseUsdPrice" }, { status: 400 });
   }
-
+if (discountActive && (discountPercent < 1 || discountPercent > 90)) {
+  return Response.json(
+    { error: "El descuento debe estar entre 1 y 90" },
+    { status: 400 }
+  );
+}
   const exists = await prisma.product.findUnique({ where: { slug } });
   if (exists) {
     return Response.json({ error: "Slug already exists" }, { status: 409 });
@@ -136,6 +155,9 @@ export async function POST(req: Request) {
       stock,
       active,
       minQtyStep,
+      minPurchaseQty,
+      discountActive,
+      discountPercent,
       allowedMethods,
       images: imageUrl
         ? { create: [{ url: imageUrl, alt: name, sort: 0 }] }

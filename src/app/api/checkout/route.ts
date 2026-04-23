@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   try {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
     const userId = (token as any)?.id ?? token?.sub ?? null;
-
+    const isAdmin = (token as any)?.role === "ADMIN";
     const body = await req.json();
 
     // Sanitizar y validar datos del cliente
@@ -375,58 +375,87 @@ const total = baseTotal + paymentSurcharge;
         // -------------------------
     // Validar stock real antes de crear pedido
     // -------------------------
-    for (const i of items) {
-      const qty = Math.max(1, Number(i.qty || 1));
-      const variantId = i.variantId ? String(i.variantId) : null;
-      const productId = String(i.productId);
+ // -------------------------
+// Validar stock web real antes de crear pedido
+// -------------------------
+for (const i of items) {
+  const qty = Math.max(1, Number(i.qty || 1));
+  const variantId = i.variantId ? String(i.variantId) : null;
+  const productId = String(i.productId);
 
-      if (variantId) {
-        const variant = await prisma.productVariant.findUnique({
-          where: { id: variantId },
-          include: { product: true },
-        });
+  if (variantId) {
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: variantId },
+      include: {
+        product: true,
+        supplierMaps: {
+          select: {
+            supplierStock: true,
+          },
+        },
+      },
+    });
 
-        if (!variant) {
-          return Response.json(
-            { error: "Variante no encontrada", field: "variant" },
-            { status: 400 }
-          );
-        }
-
-        if (variant.stock < qty) {
-          return Response.json(
-            {
-              error: `Stock insuficiente para "${variant.product.name}". Disponible: ${variant.stock}, solicitado: ${qty}`,
-              field: "stock",
-            },
-            { status: 400 }
-          );
-        }
-      } else {
-        const product = await prisma.product.findUnique({
-          where: { id: productId },
-        });
-
-        if (!product) {
-          return Response.json(
-            { error: "Producto no encontrado", field: "product" },
-            { status: 400 }
-          );
-        }
-
-        const stock = product.stock ?? 0;
-
-        if (stock < qty) {
-          return Response.json(
-            {
-              error: `Stock insuficiente para "${product.name}". Disponible: ${stock}, solicitado: ${qty}`,
-              field: "stock",
-            },
-            { status: 400 }
-          );
-        }
-      }
+    if (!variant) {
+      return Response.json(
+        { error: "Variante no encontrada", field: "variant" },
+        { status: 400 }
+      );
     }
+
+    const supplierStock = variant.supplierMaps.reduce(
+      (sum, s) => sum + (s.supplierStock ?? 0),
+      0
+    );
+
+    const availableStock = variant.stock + supplierStock;
+
+    if (availableStock < qty) {
+      return Response.json(
+        {
+          error: `Stock insuficiente para "${variant.product.name}". Disponible: ${availableStock}, solicitado: ${qty}`,
+          field: "stock",
+        },
+        { status: 400 }
+      );
+    }
+  } else {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        supplierMap: {
+          select: {
+            supplierStock: true,
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      return Response.json(
+        { error: "Producto no encontrado", field: "product" },
+        { status: 400 }
+      );
+    }
+
+    const supplierStock = product.supplierMap.reduce(
+      (sum, s) => sum + (s.supplierStock ?? 0),
+      0
+    );
+
+    const availableStock = (product.stock ?? 0) + supplierStock;
+
+    if (availableStock < qty) {
+      return Response.json(
+        {
+          error: `Stock insuficiente para "${product.name}". Disponible: ${availableStock}, solicitado: ${qty}`,
+          field: "stock",
+        },
+        { status: 400 }
+      );
+    }
+  }
+}
     // -------------------------
     // Crear pedido PENDIENTE
     // -------------------------

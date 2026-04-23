@@ -10,6 +10,9 @@ export type CartItem = {
   name: string;
   imageUrl?: string | null;
 
+
+  originalUnitPrice?: number | null;
+  discountPercent?: number | null;
   unitPrice: number;
   qty: number;
   minQtyStep?: number | null;

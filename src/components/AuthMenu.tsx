@@ -12,23 +12,32 @@ import {
   ShoppingCart,
   Building,
   Settings,
-  LayoutDashboard,
   ChevronDown,
   UserCircle,
   Truck,
   FolderTree,
   Store,
   BarChart,
+  ClipboardList,
+  Link2,
+  Boxes,
+  PackagePlus,
+  PackageMinus,
 } from "lucide-react";
 
 // Función auxiliar para mostrar el nombre legible del rol
 const getRoleDisplayName = (role: string | undefined): string => {
   switch (role) {
-    case "ADMIN": return "Administrador";
-    case "VENTAS": return "Ventas";
-    case "STOCK": return "Stock";
-    case "REVENDEDOR": return "Revendedor";
-    default: return "Mi cuenta";
+    case "ADMIN":
+      return "Administrador";
+    case "VENTAS":
+      return "Ventas";
+    case "STOCK":
+      return "Stock";
+    case "REVENDEDOR":
+      return "Revendedor";
+    default:
+      return "Mi cuenta";
   }
 };
 
@@ -38,12 +47,16 @@ export default function AuthButton() {
   const role = user?.role as string | undefined;
 
   const [open, setOpen] = useState(false);
+  const [stockMenuOpen, setStockMenuOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (!ref.current) return;
-      if (!ref.current.contains(e.target as Node)) setOpen(false);
+      if (!ref.current.contains(e.target as Node)) {
+  setOpen(false);
+  setStockMenuOpen(false);
+}
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
@@ -97,61 +110,150 @@ export default function AuthButton() {
 
           {/* Menú según el rol */}
           {role === "ADMIN" && (
-            <>
-              <Link
-                href="/admin/productos"
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
-                onClick={() => setOpen(false)}
-              >
-                <Package className="h-4 w-4" />
-                Productos
-              </Link>
-              <Link
-                href="/admin/categorias"
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
-                onClick={() => setOpen(false)}
-              >
-                <FolderTree className="h-4 w-4" />
-                Categorías
-              </Link>
-              <Link
-                href="/admin/usuarios"
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
-                onClick={() => setOpen(false)}
-              >
-                <Users className="h-4 w-4" />
-                Usuarios
-              </Link>
-              <Link
-                href="/admin/pedidos"
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
-                onClick={() => setOpen(false)}
-              >
-                <ShoppingCart className="h-4 w-4" />
-                Pedidos
-              </Link>
-              <Link
-                href="/admin/proveedores"
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
-                onClick={() => setOpen(false)}
-              >
-                <Building className="h-4 w-4" />
-                Proveedores
-              </Link>
-              <Link
-                href="/admin/configuracion"
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
-                onClick={() => setOpen(false)}
-              >
-                <Settings className="h-4 w-4" />
-                Configuración
-              </Link>
-            </>
-          )}
+  <>
+    <Link
+      href="/admin/productos"
+      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+      onClick={() => setOpen(false)}
+    >
+      <Package className="h-4 w-4" />
+      Productos
+    </Link>
+
+    <Link
+      href="/admin/categorias"
+      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+      onClick={() => setOpen(false)}
+    >
+      <FolderTree className="h-4 w-4" />
+      Categorías
+    </Link>
+
+    <Link
+      href="/admin/usuarios"
+      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+      onClick={() => setOpen(false)}
+    >
+      <Users className="h-4 w-4" />
+      Usuarios
+    </Link>
+
+    <Link
+      href="/admin/pedidos"
+      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+      onClick={() => setOpen(false)}
+    >
+      <ShoppingCart className="h-4 w-4" />
+      Pedidos
+    </Link>
+
+    {/* Submenu Stock */}
+    <div className="rounded-xl border border-conquer-pink/20">
+      <button
+        type="button"
+        onClick={() => setStockMenuOpen((v) => !v)}
+        className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+      >
+        <span className="flex items-center gap-3">
+          <Boxes className="h-4 w-4" />
+          Stock
+        </span>
+
+        <ChevronDown
+          className={`h-4 w-4 transition-transform duration-200 ${
+            stockMenuOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {stockMenuOpen && (
+        <div className="mt-1 flex flex-col gap-1 px-2 pb-2">
+          <Link
+            href="/admin/stock"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+            onClick={() => {
+              setOpen(false);
+              setStockMenuOpen(false);
+            }}
+          >
+            <Boxes className="h-4 w-4" />
+            Ver stock
+          </Link>
+
+          <Link
+            href="/admin/stock/movimientos"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+            onClick={() => {
+              setOpen(false);
+              setStockMenuOpen(false);
+            }}
+          >
+            <ClipboardList className="h-4 w-4" />
+            Movimientos
+          </Link>
+
+          <Link
+            href="/admin/stock/vincular"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+            onClick={() => {
+              setOpen(false);
+              setStockMenuOpen(false);
+            }}
+          >
+            <Link2 className="h-4 w-4" />
+            Vincular proveedor
+          </Link>
+
+          <Link
+            href="/admin/stock/ingresar"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+            onClick={() => {
+              setOpen(false);
+              setStockMenuOpen(false);
+            }}
+          >
+            <PackagePlus className="h-4 w-4" />
+            Ingresar mercadería
+          </Link>
+
+          <Link
+            href="/admin/stock/sacar"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+            onClick={() => {
+              setOpen(false);
+              setStockMenuOpen(false);
+            }}
+          >
+            <PackageMinus className="h-4 w-4" />
+            Sacar mercadería
+          </Link>
+        </div>
+      )}
+    </div>
+
+    <Link
+      href="/admin/proveedores"
+      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+      onClick={() => setOpen(false)}
+    >
+      <Building className="h-4 w-4" />
+      Proveedores
+    </Link>
+
+    <Link
+      href="/admin/configuracion"
+      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+      onClick={() => setOpen(false)}
+    >
+      <Settings className="h-4 w-4" />
+      Configuración
+    </Link>
+  </>
+)}
 
           {role === "VENTAS" && (
             <>
-            <Link
+              <Link
                 href="/admin/productos"
                 className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
                 onClick={() => setOpen(false)}
@@ -181,12 +283,54 @@ export default function AuthButton() {
           {role === "STOCK" && (
             <>
               <Link
+                href="/admin/stock"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                <Boxes className="h-4 w-4" />
+                Stock
+              </Link>
+
+              <Link
+                href="/admin/stock/movimientos"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Movimientos
+              </Link>
+
+              <Link
+                href="/admin/stock/vincular"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                <Link2 className="h-4 w-4" />
+                Vincular proveedor
+              </Link>
+              <Link
+                href="/admin/stock/ingresar"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                <PackagePlus className="h-4 w-4" />
+                Ingresar mercadería
+              </Link>
+              <Link
+                href="/admin/stock/sacar"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                <PackageMinus className="h-4 w-4" />
+                Sacar mercadería
+              </Link>
+              <Link
                 href="/admin/productos"
                 className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
                 onClick={() => setOpen(false)}
               >
                 <Package className="h-4 w-4" />
-                Gestionar stock
+                Productos
               </Link>
             </>
           )}
@@ -213,7 +357,11 @@ export default function AuthButton() {
           )}
 
           {/* Para clientes normales (CUSTOMER) y cualquier otro rol no contemplado */}
-          {(role === "CUSTOMER" || (role !== "ADMIN" && role !== "VENTAS" && role !== "STOCK" && role !== "REVENDEDOR")) && (
+          {(role === "CUSTOMER" ||
+            (role !== "ADMIN" &&
+              role !== "VENTAS" &&
+              role !== "STOCK" &&
+              role !== "REVENDEDOR")) && (
             <>
               <Link
                 href="/mi-cuenta"

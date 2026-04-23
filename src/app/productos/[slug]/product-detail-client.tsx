@@ -45,6 +45,9 @@ type ProductDTO = {
   variants?: VariantDTO[];
   allowedMethods?: PersonalizationMethod[];
   minQtyStep?: number | null;
+  minPurchaseQty?: number | null;
+  discountActive?: boolean;
+  discountPercent?: number;
 };
 
 function formatARS(value: number) {
@@ -56,8 +59,10 @@ function formatARS(value: number) {
 }
 
 export default function ProductDetailClient({ product }: { product: ProductDTO }) {
-  const step = Math.max(1, Number(product.minQtyStep ?? 1));
-  const [qty, setQty] = useState(step);
+const step = Math.max(1, Number(product.minQtyStep ?? 1));
+const minPurchaseQty = Math.max(1, Number(product.minPurchaseQty ?? 1));
+const initialQty = Math.max(minPurchaseQty, step);
+const [qty, setQty] = useState(initialQty);
   const [addedMsg, setAddedMsg] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -95,28 +100,37 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
     () => unitPriceForQty(product.priceTiers ?? [], basePriceInPesos, qty),
     [product.priceTiers, basePriceInPesos, qty]
   );
+  const hasDiscount =
+  product.discountActive === true &&
+  (product.discountPercent ?? 0) > 0;
 
-  useEffect(() => {
-    setQty((q) => {
-      const n = Number.isFinite(q) ? q : step;
-      return Math.max(step, Math.round(n / step) * step);
-    });
-  }, [step]);
+const discountedUnitPrice = useMemo(() => {
+  if (!hasDiscount) return unitPrice;
+  return Math.round(unitPrice * (1 - (product.discountPercent ?? 0) / 100));
+}, [unitPrice, hasDiscount, product.discountPercent]);
+
+useEffect(() => {
+  setQty((q) => {
+    const n = Number.isFinite(q) ? q : initialQty;
+    const rounded = Math.round(n / step) * step;
+    return Math.max(minPurchaseQty, rounded);
+  });
+}, [step, minPurchaseQty, initialQty]);
 
   useEffect(() => {
     if (maxQty === 0) {
-      setQty(step);
+      setQty(initialQty);
       return;
     }
 
     setQty((q) => {
-      const safe = Math.max(step, q);
+      const safe = Math.max(minPurchaseQty, q);
       const rounded = Math.round(safe / step) * step;
       return Math.min(rounded, maxQty);
     });
   }, [maxQty, step]);
 
-  const total = unitPrice * qty;
+  const total = discountedUnitPrice * qty;
 
   const nextTier = useMemo(() => {
     const tiers = [...(product.priceTiers ?? [])].sort((a, b) => a.minQty - b.minQty);
@@ -131,11 +145,11 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
   }, [product.priceTiers, qty]);
 
   const exceedsStock =
-    typeof stock === "number" && stock > 0 ? qty > stock : false;
+    typeof stock === "number" ? qty > maxQty : false
 
   const cannotAdd =
     typeof stock === "number"
-      ? stock <= 0 || exceedsStock || qty > maxQty
+      ? stock <= 0 || qty > maxQty
       : false;
 
   const handleAddToCart = () => {
@@ -147,7 +161,9 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
         slug: product.slug,
         name: product.name,
         imageUrl: activeImg ?? null,
-        unitPrice,
+        unitPrice: discountedUnitPrice,
+        originalUnitPrice: hasDiscount ? unitPrice : null,
+        discountPercent: hasDiscount ? (product.discountPercent ?? 0) : null,
         method,
         minQtyStep: step,
         variantId: selectedVariant?.id ?? null,
@@ -232,9 +248,25 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
               <div>
                 <span className="text-sm font-medium text-neutral-500">Precio unitario</span>
                 <div className="mt-1 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-conquer-navy">
-                    {formatARS(unitPrice)}
-                  </span>
+                 <div className="mt-1">
+  {hasDiscount && (
+    <div className="text-sm text-neutral-400 line-through">
+      {formatARS(unitPrice)}
+    </div>
+  )}
+
+  <div className="flex flex-wrap items-baseline gap-2">
+    <span className="text-3xl font-bold text-conquer-navy">
+      {formatARS(discountedUnitPrice)}
+    </span>
+
+    {hasDiscount && (
+      <span className="rounded-full bg-conquer-turq px-2 py-1 text-xs font-bold text-conquer-navy">
+        OFERTA -{product.discountPercent}%
+      </span>
+    )}
+  </div>
+</div>
                   {currentTier && (
                     <span className="rounded-full bg-conquer-turq/20 px-2 py-1 text-xs font-medium text-conquer-navy">
                       {currentTier.minQty}+
@@ -260,9 +292,9 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
                 </span>
                 <div className="flex items-center overflow-hidden rounded-xl border-2 border-conquer-pink/50 bg-white">
                   <button
-                    onClick={() => setQty((q) => Math.max(step, q - step))}
+                    onClick={() => setQty((q) => Math.max(minPurchaseQty, q - step))}
                     className="flex h-10 w-10 items-center justify-center transition-colors hover:bg-conquer-pink/20 disabled:opacity-50"
-                    disabled={qty <= step}
+                    disabled={qty <= minPurchaseQty}
                   >
                     <Minus className="h-4 w-4" />
                   </button>
@@ -270,14 +302,14 @@ export default function ProductDetailClient({ product }: { product: ProductDTO }
                   <input
                     className="h-10 w-20 border-x-2 border-conquer-pink/30 text-center font-medium outline-none"
                     value={qty}
-                    min={step}
+                    min={minPurchaseQty}
                     max={maxQty || undefined}
                     step={step}
                     onChange={(e) => {
                       const raw = Number(e.target.value || step);
-                      const safe = Number.isFinite(raw) ? raw : step;
-                      const rounded = Math.max(step, Math.round(safe / step) * step);
-                      const capped = maxQty > 0 ? Math.min(rounded, maxQty) : step;
+                      const safe = Number.isFinite(raw) ? raw : initialQty;
+                      const rounded = Math.max(minPurchaseQty, Math.round(safe / step) * step);
+                      const capped = maxQty > 0 ? Math.min(rounded, maxQty) : initialQty;
                       setQty(capped);
                     }}
                   />

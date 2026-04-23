@@ -13,8 +13,6 @@ import {
   Hash,
   Image as ImageIcon,
   Package,
-  CheckCircle,
-  AlertCircle,
 } from "lucide-react";
 
 type CategoryRow = {
@@ -22,6 +20,17 @@ type CategoryRow = {
   name: string;
   slug: string;
   image?: string | null;
+  parentId?: string | null;
+  parent?: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+  children?: {
+    id: string;
+    name: string;
+    slug: string;
+  }[];
   _count?: { products?: number };
 };
 
@@ -49,6 +58,7 @@ export default function CategoriesAdminClient({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [parentId, setParentId] = useState("");
 
   // edición inline
   const [editId, setEditId] = useState<string | null>(null);
@@ -57,6 +67,7 @@ export default function CategoriesAdminClient({
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
   const [editUploading, setEditUploading] = useState(false);
+  const [editParentId, setEditParentId] = useState("");
 
   const disabledCreate = useMemo(() => saving || !name.trim(), [saving, name]);
 
@@ -69,7 +80,9 @@ export default function CategoriesAdminClient({
   async function uploadImage(file: File): Promise<string | null> {
     setUploading(true);
     try {
-      const signRes = await fetch("/api/cloudinary/category-sign", { method: "POST" });
+      const signRes = await fetch("/api/cloudinary/category-sign", {
+        method: "POST",
+      });
       const signed = await signRes.json();
 
       const formData = new FormData();
@@ -110,6 +123,7 @@ export default function CategoriesAdminClient({
 
     try {
       const finalSlug = (slug.trim() || slugify(name)).trim();
+
       const res = await fetch("/api/admin/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -117,8 +131,10 @@ export default function CategoriesAdminClient({
           name: name.trim(),
           slug: finalSlug,
           image: imageUrl,
+          parentId: parentId || null,
         }),
       });
+
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         alert(payload?.error || "No se pudo crear");
@@ -127,8 +143,10 @@ export default function CategoriesAdminClient({
 
       setName("");
       setSlug("");
+      setParentId("");
       setImageFile(null);
       setImagePreview(null);
+
       await refresh();
     } finally {
       setSaving(false);
@@ -139,6 +157,7 @@ export default function CategoriesAdminClient({
     setEditId(c.id);
     setEditName(c.name);
     setEditSlug(c.slug);
+    setEditParentId(c.parentId ?? "");
     setEditImagePreview(c.image || null);
     setEditImageFile(null);
   }
@@ -147,6 +166,7 @@ export default function CategoriesAdminClient({
     setEditId(null);
     setEditName("");
     setEditSlug("");
+    setEditParentId("");
     setEditImageFile(null);
     setEditImagePreview(null);
   }
@@ -174,6 +194,7 @@ export default function CategoriesAdminClient({
           name: editName.trim(),
           slug: editSlug.trim() || slugify(editName),
           image: imageUrl,
+          parentId: editParentId || null,
         }),
       });
 
@@ -191,7 +212,7 @@ export default function CategoriesAdminClient({
   }
 
   async function onDelete(id: string) {
-    if (!confirm("¿Eliminar categoría? Si tiene productos asociados, puede fallar.")) return;
+    if (!confirm("¿Eliminar categoría? Si tiene productos o subcategorías asociadas, puede fallar.")) return;
 
     setSaving(true);
     try {
@@ -209,7 +230,6 @@ export default function CategoriesAdminClient({
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      {/* Cabecera */}
       <div className="flex items-center justify-between gap-3 mb-8">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-conquer-orange/10">
@@ -217,6 +237,7 @@ export default function CategoriesAdminClient({
           </div>
           <h1 className="text-2xl font-bold text-conquer-navy">Categorías</h1>
         </div>
+
         <a
           href="/admin/productos"
           className="flex items-center gap-2 h-10 px-4 rounded-2xl border border-conquer-pink/30 text-conquer-navy hover:bg-conquer-pink/10 transition-colors"
@@ -226,12 +247,12 @@ export default function CategoriesAdminClient({
         </a>
       </div>
 
-      {/* Formulario de creación */}
       <div className="bg-white rounded-3xl border border-conquer-pink/30 p-6 shadow-sm mb-8">
         <h2 className="text-lg font-semibold text-conquer-navy mb-4 flex items-center gap-2">
           <Plus className="h-5 w-5 text-conquer-orange" />
           Nueva categoría
         </h2>
+
         <form onSubmit={onCreate} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -250,6 +271,7 @@ export default function CategoriesAdminClient({
                 }}
               />
             </div>
+
             <div className="space-y-2">
               <label className="flex items-center gap-1 text-sm font-medium text-conquer-navy">
                 <Hash className="h-4 w-4" />
@@ -262,23 +284,36 @@ export default function CategoriesAdminClient({
                 onChange={(e) => setSlug(e.target.value)}
               />
             </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-conquer-navy">
+                Categoría padre
+              </label>
+              <select
+                value={parentId}
+                onChange={(e) => setParentId(e.target.value)}
+                className="h-11 w-full rounded-2xl border border-conquer-pink/30 px-4 outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
+              >
+                <option value="">Sin padre</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          {/* Subir imagen */}
           <div className="border border-conquer-pink/30 rounded-2xl p-4 bg-conquer-pink/5">
             <label className="flex items-center gap-2 text-sm font-medium text-conquer-navy mb-3">
               <ImageIcon className="h-4 w-4" />
               Imagen de la categoría (opcional)
             </label>
+
             <div className="flex flex-col sm:flex-row gap-4 items-start">
               {imagePreview && (
                 <div className="relative w-24 h-24 rounded-xl overflow-hidden border-2 border-conquer-pink/30">
-                  <Image
-                    src={imagePreview}
-                    alt="Preview"
-                    fill
-                    className="object-cover"
-                  />
+                  <Image src={imagePreview} alt="Preview" fill className="object-cover" />
                   <button
                     type="button"
                     onClick={() => {
@@ -292,6 +327,7 @@ export default function CategoriesAdminClient({
                   </button>
                 </div>
               )}
+
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <label className="cursor-pointer">
@@ -312,10 +348,12 @@ export default function CategoriesAdminClient({
                       className="hidden"
                     />
                   </label>
+
                   {imageFile && (
                     <span className="text-sm text-neutral-600">{imageFile.name}</span>
                   )}
                 </div>
+
                 <p className="text-xs text-neutral-500 mt-2">
                   Imagen recomendada: 400x400px, formato JPG o PNG.
                 </p>
@@ -348,7 +386,6 @@ export default function CategoriesAdminClient({
         </form>
       </div>
 
-      {/* Listado de categorías */}
       <div className="bg-white rounded-3xl border border-conquer-pink/30 overflow-hidden shadow-sm">
         <div className="px-6 py-4 border-b border-conquer-pink/20 bg-conquer-pink/5">
           <div className="flex items-center justify-between">
@@ -373,26 +410,26 @@ export default function CategoriesAdminClient({
               const productCount = c?._count?.products ?? 0;
 
               return (
-                <div key={c.id} className="p-4 sm:p-6 hover:bg-conquer-pink/5 transition-colors">
+                <div
+                  key={c.id}
+                  className="p-4 sm:p-6 hover:bg-conquer-pink/5 transition-colors"
+                >
                   {!isEdit ? (
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div className="flex items-center gap-4">
                         {c.image ? (
                           <div className="relative h-14 w-14 rounded-xl overflow-hidden border-2 border-conquer-pink/30 flex-shrink-0">
-                            <Image
-                              src={c.image}
-                              alt={c.name}
-                              fill
-                              className="object-cover"
-                            />
+                            <Image src={c.image} alt={c.name} fill className="object-cover" />
                           </div>
                         ) : (
                           <div className="h-14 w-14 rounded-xl bg-conquer-pink/10 border-2 border-conquer-pink/30 flex items-center justify-center flex-shrink-0">
                             <ImageIcon className="h-6 w-6 text-conquer-navy/40" />
                           </div>
                         )}
+
                         <div>
                           <h3 className="text-base font-semibold text-conquer-navy">{c.name}</h3>
+
                           <div className="flex flex-wrap items-center gap-2 mt-1">
                             <span className="text-xs text-neutral-500">/{c.slug}</span>
                             <span className="inline-flex items-center gap-1 rounded-full bg-conquer-pink/20 px-3 py-1 text-xs font-medium text-conquer-navy">
@@ -400,8 +437,21 @@ export default function CategoriesAdminClient({
                               {productCount} {productCount === 1 ? "producto" : "productos"}
                             </span>
                           </div>
+
+                          <div className="mt-2 space-y-1">
+                            <div className="text-xs text-neutral-500">
+                              Padre: <b>{c.parent?.name ?? "Sin padre"}</b>
+                            </div>
+
+                            {c.children && c.children.length > 0 && (
+                              <div className="text-xs text-neutral-500">
+                                Hijas: <b>{c.children.map((child) => child.name).join(", ")}</b>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
+
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -411,6 +461,7 @@ export default function CategoriesAdminClient({
                           <Edit className="h-4 w-4" />
                           Editar
                         </button>
+
                         <button
                           type="button"
                           onClick={() => onDelete(c.id)}
@@ -431,20 +482,41 @@ export default function CategoriesAdminClient({
                           onChange={(e) => setEditName(e.target.value)}
                           placeholder="Nombre"
                         />
+
                         <input
                           className="h-11 rounded-2xl border border-conquer-pink/30 px-4 outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
                           value={editSlug}
                           onChange={(e) => setEditSlug(e.target.value)}
                           placeholder="Slug"
                         />
+
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="text-sm font-medium text-conquer-navy">
+                            Categoría padre
+                          </label>
+                          <select
+                            value={editParentId}
+                            onChange={(e) => setEditParentId(e.target.value)}
+                            className="h-11 w-full rounded-2xl border border-conquer-pink/30 px-4 outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
+                          >
+                            <option value="">Sin padre</option>
+                            {categories
+                              .filter((cat) => cat.id !== editId)
+                              .map((cat) => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.name}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
                       </div>
 
-                      {/* Editar imagen */}
                       <div className="border border-conquer-pink/30 rounded-2xl p-4 bg-conquer-pink/5">
                         <label className="flex items-center gap-2 text-sm font-medium text-conquer-navy mb-3">
                           <ImageIcon className="h-4 w-4" />
                           Imagen de la categoría
                         </label>
+
                         <div className="flex flex-col sm:flex-row gap-4 items-start">
                           {editImagePreview ? (
                             <div className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-conquer-pink/30">
@@ -471,6 +543,7 @@ export default function CategoriesAdminClient({
                               <ImageIcon className="h-8 w-8 text-conquer-navy/40" />
                             </div>
                           )}
+
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <label className="cursor-pointer">
@@ -491,6 +564,7 @@ export default function CategoriesAdminClient({
                                   className="hidden"
                                 />
                               </label>
+
                               {editImageFile && (
                                 <span className="text-sm text-neutral-600">{editImageFile.name}</span>
                               )}
@@ -518,6 +592,7 @@ export default function CategoriesAdminClient({
                             </>
                           )}
                         </button>
+
                         <button
                           type="button"
                           onClick={cancelEdit}

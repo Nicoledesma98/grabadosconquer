@@ -28,7 +28,24 @@ export async function GET(req: NextRequest) {
 
   const categories = await prisma.category.findMany({
     orderBy: { name: "asc" },
-    include: { _count: { select: { products: true } } }, // si rompe, borrarlo
+    include: {
+      parent: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      },
+      children: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+        orderBy: { name: "asc" },
+      },
+      _count: { select: { products: true } },
+    },
   });
 
   return Response.json(categories);
@@ -42,16 +59,55 @@ export async function POST(req: NextRequest) {
 
   const name = String(body?.name ?? "").trim();
   const slugRaw = String(body?.slug ?? "").trim();
+  const parentId = body?.parentId ? String(body.parentId) : null;
 
   if (!name) return Response.json({ error: "Name requerido" }, { status: 400 });
 
   const slug = slugRaw ? slugify(slugRaw) : slugify(name);
   if (!slug) return Response.json({ error: "Slug inválido" }, { status: 400 });
 
+  if (parentId) {
+    const parent = await prisma.category.findUnique({
+      where: { id: parentId },
+      select: { id: true },
+    });
+
+    if (!parent) {
+      return Response.json({ error: "Categoría padre no encontrada" }, { status: 400 });
+    }
+  }
+
   try {
     const created = await prisma.category.create({
-      data: { name, slug, image: body.image || null },
+      data: {
+        name,
+        slug,
+        image: body.image || null,
+        parentId,
+      },
+      include: {
+        parent: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        children: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        _count: {
+          select: {
+            products: true,
+          },
+        },
+      },
     });
+
     return Response.json(created, { status: 201 });
   } catch (e: any) {
     return Response.json(
