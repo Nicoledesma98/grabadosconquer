@@ -26,7 +26,7 @@ function formatARS(value: number) {
 }
 
 const VAT_RATE = 0.21;
-const MIN_PURCHASE = 90000;
+const MIN_PURCHASE = 90;
 
 export default function CarritoPage() {
   const items = useCart((s) => s.items);

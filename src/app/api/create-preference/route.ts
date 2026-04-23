@@ -87,7 +87,7 @@ if (order.shipping > 0) {
 if (order.paymentSurcharge > 0) {
   mpItems.push({
     id: "mp-surcharge",
-    title: "Recargo Mercado Pago 10%",
+    title: "Recargo Mercado Pago 5%",
     quantity: 1,
     unit_price: order.paymentSurcharge,
     currency_id: "ARS",
@@ -116,10 +116,9 @@ console.log("success URL:", `${baseUrl}/pago-procesando`);
     });
 
     return NextResponse.json({
-      id: preference.id,
-      init_point: preference.init_point,
-      sandbox_init_point: preference.sandbox_init_point,
-    });
+  id: preference.id,
+  init_point: preference.init_point,
+});
   } catch (error: any) {
   console.error("Error creando preferencia:", error);
   return NextResponse.json(

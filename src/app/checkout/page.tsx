@@ -369,7 +369,7 @@ export default function CheckoutPage({ forceEnableMercadoPago = false,}: Checkou
 
   const total = baseTotal + surcharge;
 
-  const MIN_PURCHASE = 90000;
+  const MIN_PURCHASE = 90;
   const meetsMinimum = total >= MIN_PURCHASE;
 
   const getFieldError = (field: keyof ValidationErrors): string | null => {
@@ -604,10 +604,12 @@ export default function CheckoutPage({ forceEnableMercadoPago = false,}: Checkou
         }
 
         // Redirigir al checkout de Mercado Pago
-        window.location.href =
-          prefData.sandbox_init_point || prefData.init_point; //`https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=${prefData.id}`;
+        window.location.href = prefData.init_point; //`https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=${prefData.id}`;
         return; // Importante: salir de la función para que no continúe
       }
+      //asi estaba
+      //window.location.href =
+          //prefData.sandbox_init_point || prefData.init_point;
 
       if (paymentMethod === "COORDINATE") {
         const msg = encodeURIComponent(
