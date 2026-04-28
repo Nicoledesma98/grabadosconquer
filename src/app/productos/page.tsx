@@ -12,34 +12,34 @@ import {
   Tag,
 } from "lucide-react";
 import ProductFilters from "./components/ProductFilters";
-//import { unstable_cache } from "next/cache";
+import { unstable_cache } from "next/cache";
 
 export const runtime = "nodejs";
 
 const PAGE_SIZE = 24;
 
 // ✅ Categorías cacheadas 5 minutos — no golpea la DB en cada request
-//const getCachedCategories = unstable_cache(
-  //async () => {
-    //return prisma.category.findMany({
-      //where: { active: true, parentId: null },
-      //orderBy: { name: "asc" },
-      //select: {
-        //id: true,
-        //name: true,
-        //slug: true,
-        //parentId: true,
-        //children: {
-          //where: { active: true },
-          //orderBy: { name: "asc" },
-          //select: { id: true, name: true, slug: true, parentId: true },
-        //},
-      //},
-    //});
-  //},
-  //["all-categories"],
-  //{ revalidate: 300 }
-//);
+const getCachedCategories = unstable_cache(
+  async () => {
+    return prisma.category.findMany({
+      where: { active: true, parentId: null },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        parentId: true,
+        children: {
+          where: { active: true },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, slug: true, parentId: true },
+        },
+      },
+    });
+  },
+  ["all-categories"],
+  { revalidate: 300 }
+);
 
 function buildQueryString(
   params: Record<string, string | number | undefined>
@@ -80,65 +80,27 @@ export default async function ProductosPage({
   // ✅ Solo 2 queries en paralelo:
   // - allCategories: viene del cache, ~0ms después del primer request
   // - selectedCategory: solo corre si hay un filtro de categoría activo
-  //const t1 = Date.now();
-  //const [allCategories, selectedCategory] = await Promise.all([
-    //getCachedCategories(),
-    //cat
-      //? prisma.category.findUnique({
-          //where: { slug: cat },
-          //select: {
-            //id: true,
-            //name: true,
-            //children: {
-              //select: { id: true },
-            //},
-          //},
-        //})
-      //: null,
-  //]);
-  //console.log("⏱ categories ms:", Date.now() - t1);
+  const t1 = Date.now();
+  const [allCategories, selectedCategory] = await Promise.all([
+    getCachedCategories(),
+    cat
+      ? prisma.category.findUnique({
+          where: { slug: cat },
+          select: {
+            id: true,
+            name: true,
+            children: {
+              select: { id: true },
+            },
+          },
+        })
+      : null,
+  ]);
+  console.log("⏱ categories ms:", Date.now() - t1);
 
   // categoryName resuelto acá, sin query extra al final
-  //const categoryName = selectedCategory?.name ?? cat;
-  const t1 = Date.now();
+  const categoryName = selectedCategory?.name ?? cat;
 
-const allCategories = await prisma.category.findMany({
-  where: { active: true, parentId: null },
-  orderBy: { name: "asc" },
-  select: {
-    id: true,
-    name: true,
-    slug: true,
-    parentId: true,
-    children: {
-      where: { active: true },
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        parentId: true,
-      },
-    },
-  },
-});
-
-const selectedCategory = cat
-  ? await prisma.category.findUnique({
-      where: { slug: cat },
-      select: {
-        id: true,
-        name: true,
-        children: {
-          select: { id: true },
-        },
-      },
-    })
-  : null;
-
-console.log("⏱ categories ms:", Date.now() - t1);
-
-const categoryName = selectedCategory?.name ?? cat;
   // Armar filtro de categoría
   let categoryFilter = {};
   if (selectedCategory) {
