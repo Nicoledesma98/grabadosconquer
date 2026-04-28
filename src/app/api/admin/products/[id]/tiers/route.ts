@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/require-admin";
+import { requireProductsAccess } from "@/lib/require-admin-sell";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin(req);
+  const guard = await requireProductsAccess(req);
   if (!guard.ok) return Response.json({ error: guard.error }, { status: guard.status });
   const { id: productId } = await ctx.params;
   const body = await req.json();
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 }
 
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin(req);
+  const guard = await requireProductsAccess(req);
   if (!guard.ok) return Response.json({ error: guard.error }, { status: guard.status });
   const { id: productId } = await ctx.params;
   const { searchParams } = new URL(req.url);

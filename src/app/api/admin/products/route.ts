@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/require-admin";
+import { requireProductsAccess } from "@/lib/require-admin-sell";
 
 export const runtime = "nodejs";
 
@@ -82,7 +82,7 @@ function calculateFinalPriceInPesos(
   return Math.round(finalPrice);
 }
 export async function POST(req: NextRequest) {
-  const guard = await requireAdmin(req);
+  const guard = await requireProductsAccess(req);
   if (!guard.ok) return Response.json({ error: guard.error }, { status: guard.status });
 
   const body = await req.json();
