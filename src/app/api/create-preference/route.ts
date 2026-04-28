@@ -93,7 +93,7 @@ if (order.paymentSurcharge > 0) {
     currency_id: "ARS",
   });
 }
-    
+   
     const preference = await new Preference(client).create({
       
       body: {
@@ -111,7 +111,6 @@ if (order.paymentSurcharge > 0) {
         external_reference: order.id,
       },
     });
-
     return NextResponse.json({
   id: preference.id,
   init_point: preference.init_point,

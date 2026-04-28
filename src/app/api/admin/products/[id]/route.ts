@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
+import { requireProductsAccess } from "@/lib/require-admin-sell";
+
 
 export const runtime = "nodejs";
 
@@ -83,7 +85,7 @@ function calculateFinalPriceInPesos(
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin(req);
+  const guard = await requireProductsAccess(req);
   if (!guard.ok) return Response.json({ error: guard.error }, { status: guard.status });
   const { id } = await ctx.params;
 
@@ -108,7 +110,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin(req);
+  const guard = await requireProductsAccess(req);
   if (!guard.ok) return Response.json({ error: guard.error }, { status: guard.status });
   const { id } = await ctx.params;
   const body = await req.json();

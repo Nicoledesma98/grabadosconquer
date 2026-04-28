@@ -82,7 +82,6 @@ export default function CheckoutPage({ forceEnableMercadoPago = false,}: Checkou
   );
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const enableMercadoPago = forceEnableMercadoPago || process.env.NEXT_PUBLIC_ENABLE_MERCADO_PAGO === "true";
   // Personalización
   const [customText, setCustomText] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -537,8 +536,6 @@ export default function CheckoutPage({ forceEnableMercadoPago = false,}: Checkou
         })),
       };
 
-      console.log("Enviando datos al checkout:", checkoutData);
-
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: {
@@ -598,10 +595,12 @@ export default function CheckoutPage({ forceEnableMercadoPago = false,}: Checkou
 
         const prefData = await prefRes.json();
         if (!prefRes.ok) {
-          throw new Error(
-            prefData.error || "Error al crear la preferencia de pago",
-          );
-        }
+  throw new Error(
+    prefData.details ||
+      prefData.error ||
+      "Error al crear la preferencia de pago"
+  );
+}
 
         // Redirigir al checkout de Mercado Pago
         window.location.href = prefData.init_point; //`https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=${prefData.id}`;
@@ -1628,7 +1627,7 @@ export default function CheckoutPage({ forceEnableMercadoPago = false,}: Checkou
                         </div>
                       </div>
                     </label>
-                    {enableMercadoPago && (
+                     
                       <label
                         className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
                           paymentMethod === "MERCADO_PAGO"
@@ -1654,7 +1653,7 @@ export default function CheckoutPage({ forceEnableMercadoPago = false,}: Checkou
                           </div>
                         </div>
                       </label>
-                    )}
+                    
                     <label
                       className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${
                         paymentMethod === "COORDINATE"
