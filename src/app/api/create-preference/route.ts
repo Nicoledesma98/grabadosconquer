@@ -94,9 +94,6 @@ if (order.paymentSurcharge > 0) {
   });
 }
     
-    console.log("APP_URL raw:", process.env.APP_URL);
-console.log("baseUrl final:", baseUrl);
-console.log("success URL:", `${baseUrl}/pago-procesando`);
     const preference = await new Preference(client).create({
       
       body: {
@@ -109,7 +106,7 @@ console.log("success URL:", `${baseUrl}/pago-procesando`);
           failure: `${baseUrl}/pago-procesando`,
           pending: `${baseUrl}/pago-procesando`,
         },
-        //auto_return: "approved",
+        auto_return: "approved",
         statement_descriptor: "GRABADOS-CONQUER",
         external_reference: order.id,
       },

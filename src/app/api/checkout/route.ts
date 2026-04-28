@@ -353,12 +353,69 @@ if (paymentMethod === "CASH" && shippingMethod !== "PICKUP") {
 }
 
     // -------------------------
+    // Resolver precios server-side (ignorar unitPrice del cliente)
+    // -------------------------
+    const productIdsUniq: string[] = [...new Set<string>(items.map((i: any) => String(i.productId)))];
+    const dbProducts = await prisma.product.findMany({
+      where: { id: { in: productIdsUniq }, active: true },
+      include: { priceTiers: true },
+    });
+    const dbProductMap = new Map(dbProducts.map((p) => [p.id, p] as [string, typeof p]));
+
+    const variantIdsUniq: string[] = [
+      ...new Set<string>(items.map((i: any) => i.variantId).filter(Boolean).map(String)),
+    ];
+    const dbVariants =
+      variantIdsUniq.length > 0
+        ? await prisma.productVariant.findMany({ where: { id: { in: variantIdsUniq } } })
+        : [];
+    const dbVariantMap = new Map(dbVariants.map((v) => [v.id, v] as [string, typeof v]));
+
+    const resolvedItems: Array<(typeof items)[0] & { realUnitPrice: number }> = [];
+
+    for (const i of items) {
+      const productId = String(i.productId);
+      const qty = Math.max(1, Number(i.qty || 1));
+      const dbProduct = dbProductMap.get(productId);
+
+      if (!dbProduct) {
+        return Response.json({ error: "Producto no encontrado", field: "product" }, { status: 400 });
+      }
+
+      const variantId = i.variantId ? String(i.variantId) : null;
+      const dbVariant = variantId ? dbVariantMap.get(variantId) : undefined;
+
+      // Precio base: priceOverride de variante (guardado en centavos) o basePrice del producto
+      let basePrice: number;
+      if (dbVariant?.priceOverride != null) {
+        basePrice = dbVariant.priceOverride / 100;
+      } else {
+        basePrice = dbProduct.basePrice ?? 0;
+      }
+
+      // Aplicar price tier según cantidad
+      const sortedTiers = [...dbProduct.priceTiers].sort((a, b) => a.minQty - b.minQty);
+      let tierPrice = basePrice;
+      for (const t of sortedTiers) {
+        if (t.minQty <= qty) tierPrice = t.price;
+        else break;
+      }
+
+      // Aplicar descuento si corresponde
+      const realUnitPrice =
+        dbProduct.discountActive && dbProduct.discountPercent > 0
+          ? Math.round(tierPrice * (1 - dbProduct.discountPercent / 100))
+          : Math.round(tierPrice);
+
+      resolvedItems.push({ ...i, realUnitPrice });
+    }
+
+    // -------------------------
     // Totales server-side
     // -------------------------
-    const subtotalNet = items.reduce((acc: number, i: any) => {
+    const subtotalNet = resolvedItems.reduce((acc, i) => {
       const qty = Math.max(1, Number(i.qty || 1));
-      const unitPrice = Math.max(0, Number(i.unitPrice || 0));
-      return acc + qty * unitPrice;
+      return acc + qty * i.realUnitPrice;
     }, 0);
 
     const vatRate = VAT_RATE;
@@ -493,23 +550,28 @@ for (const i of items) {
         shipApartment,
 
         items: {
-          create: items.map((i: any) => ({
-            productId: String(i.productId),
-            qty: Math.max(1, Number(i.qty || 1)),
-            unitPrice: Math.max(0, Number(i.unitPrice || 0)),
-            lineTotal:
-              Math.max(1, Number(i.qty || 1)) * Math.max(0, Number(i.unitPrice || 0)),
-            productName: String(i.productName),
-            productSlug: String(i.productSlug),
+          create: resolvedItems.map((i: any) => {
+            const qty = Math.max(1, Number(i.qty || 1));
+            const variantId = i.variantId ? String(i.variantId) : null;
+            const dbProduct = dbProductMap.get(String(i.productId))!;
+            const dbVariant = variantId ? dbVariantMap.get(variantId) : undefined;
+            return {
+              productId: String(i.productId),
+              qty,
+              unitPrice: i.realUnitPrice,
+              lineTotal: qty * i.realUnitPrice,
+              productName: dbProduct.name,
+              productSlug: dbProduct.slug,
 
-            variantId: i.variantId ? String(i.variantId) : null,
-            variantSku: i.variantSku ? String(i.variantSku) : null,
-            colorName: i.colorName ? String(i.colorName) : null,
-            colorHex: i.colorHex ? String(i.colorHex) : null,
+              variantId,
+              variantSku: dbVariant?.sku ?? (i.variantSku ? String(i.variantSku) : null),
+              colorName: dbVariant?.colorName ?? (i.colorName ? String(i.colorName) : null),
+              colorHex: dbVariant?.colorHex ?? (i.colorHex ? String(i.colorHex) : null),
 
-            method: i.method ?? null,
-            notes: i.notes ? String(i.notes) : null,
-          })),
+              method: i.method ?? null,
+              notes: i.notes ? String(i.notes) : null,
+            };
+          }),
         },
 
         uploads: uploadsToCreate.length > 0 ? { create: uploadsToCreate } : undefined,

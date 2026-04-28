@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/require-admin";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const guard = await requireAdmin(req);
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status });
   const exchangeRateSetting = await prisma.setting.findUnique({
     where: { key: "exchange_rate" },
   });
@@ -14,7 +17,10 @@ export async function GET() {
   return NextResponse.json({ exchangeRate, rules });
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const guard = await requireAdmin(req);
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status });
+
   try {
     const { exchangeRate, rules } = await req.json();
 

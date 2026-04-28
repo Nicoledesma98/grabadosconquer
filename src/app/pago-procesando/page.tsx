@@ -15,7 +15,7 @@ export default function PagoProcesando() {
 
     async function verifyPayment() {
       try {
-        const res = await fetch("/api/mercadopago", {
+        const res = await fetch("/api/mercadopago/verify", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

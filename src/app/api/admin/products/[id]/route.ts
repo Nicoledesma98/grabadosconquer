@@ -1,4 +1,6 @@
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/require-admin";
 
 export const runtime = "nodejs";
 
@@ -80,7 +82,9 @@ function calculateFinalPriceInPesos(
   return Math.round(finalPrice);
 }
 
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdmin(req);
+  if (!guard.ok) return Response.json({ error: guard.error }, { status: guard.status });
   const { id } = await ctx.params;
 
   const product = await prisma.product.findUnique({
@@ -103,7 +107,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   isSupplierProduct: product.supplierMap.length > 0});
 }
 
-export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdmin(req);
+  if (!guard.ok) return Response.json({ error: guard.error }, { status: guard.status });
   const { id } = await ctx.params;
   const body = await req.json();
 
