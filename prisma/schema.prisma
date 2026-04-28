@@ -125,6 +125,10 @@ model Product {
 
   orderItems     OrderItem[]
   stockMovements StockMovement[]
+  @@index([active])
+  @@index([createdAt])
+  @@index([active, createdAt])
+  @@index([active, basePrice])
 }
 
 model IntegrationLock {
@@ -179,6 +183,7 @@ model Category {
   children  Category[] @relation("CategoryToChildren")
 
   products Product[]
+  @@index([active, parentId])
 }
 
 model ProductImage {

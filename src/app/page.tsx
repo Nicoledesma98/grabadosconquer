@@ -4,6 +4,7 @@ import HomeBenefits from "@/components/HomeBenefits";
 import HomeFeatured from "@/components/HomeFeatured";
 import HomeCategories from "@/components/HomeCategories";
 
+export const revalidate = 60;
 export const runtime = "nodejs";
 
 export default async function HomePage() {

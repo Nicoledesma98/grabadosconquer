@@ -365,11 +365,11 @@ export default function CheckoutPage({ forceEnableMercadoPago = false,}: Checkou
 
   const surcharge = useMemo(() => {
     return paymentMethod === "MERCADO_PAGO" ? Math.round(baseTotal * 0.05) : 0;
-  }, [paymentMethod, baseTotal]); ///recordar que cobramos el 10 % de mas cuando es con mercado pago
+  }, [paymentMethod, baseTotal]); ///recordar que cobramos el 5 % de mas cuando es con mercado pago
 
   const total = baseTotal + surcharge;
 
-  const MIN_PURCHASE = 90;
+  const MIN_PURCHASE = 90000;
   const meetsMinimum = total >= MIN_PURCHASE;
 
   const getFieldError = (field: keyof ValidationErrors): string | null => {
