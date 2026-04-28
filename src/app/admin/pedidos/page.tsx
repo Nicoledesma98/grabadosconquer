@@ -84,15 +84,20 @@ export default async function AdminPedidosPage({
   const pageRaw = Number(pickFirst(sp.page) || "1");
   const page = Number.isFinite(pageRaw) ? pageRaw : 1;
 
+  // Si buscan "CNQ-00142" o "CNQ-142" o simplemente "142", buscar por orderNumber
+  const cnqMatch = q.match(/^CNQ-?0*(\d+)$/i) ?? q.match(/^(\d+)$/);
+  const orderNumberSearch = cnqMatch ? parseInt(cnqMatch[1], 10) : null;
+
   const where =
     q.length > 0
       ? {
-        OR: [
-          { id: { contains: q, mode: "insensitive" as const } },
-          { customerEmail: { contains: q, mode: "insensitive" as const } },
-          { customerPhone: { contains: q } },
-        ],
-      }
+          OR: [
+            { id: { contains: q, mode: "insensitive" as const } },
+            { customerEmail: { contains: q, mode: "insensitive" as const } },
+            { customerPhone: { contains: q } },
+            ...(orderNumberSearch ? [{ orderNumber: orderNumberSearch }] : []),
+          ],
+        }
       : {};
 
   const totalCount = await prisma.order.count({ where });
