@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import OrderStatusSelect from "@/components/admin/OrderStatusSelect";
 import StopPropagation from "@/components/StopPropagation";
+import { formatOrderCode } from "@/lib/utils";
 
 export const runtime = "nodejs";
 
@@ -245,7 +246,7 @@ export default async function AdminPedidosPage({
               <summary className="cursor-pointer list-none p-4 hover:bg-conquer-pink/10">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <div className="font-semibold text-conquer-navy">Pedido: {o.id}</div>
+                    <div className="font-semibold text-conquer-navy">Pedido: {formatOrderCode(o.orderNumber)}</div>
                     <div className="text-sm text-neutral-600">{o.createdAt.toLocaleString("es-AR")}</div>
                     <div className="text-sm text-neutral-600">{o.customerEmail}</div>
                   </div>

@@ -614,6 +614,7 @@ export default function AdminEditarProductoPage() {
                   onChange={(e) => setMinPurchaseQty(Number(e.target.value))}
                 >
                   <option value="1">1 unidad</option>
+                  <option value="5">5 unidades</option>
                   <option value="10">10 unidades</option>
                   <option value="25">25 unidades</option>
                   <option value="50">50 unidades</option>

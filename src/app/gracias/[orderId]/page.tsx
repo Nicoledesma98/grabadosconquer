@@ -1,5 +1,7 @@
 import Link from "next/link";
 import TransferProofUploader from "@/components/checkout/TransferProofUploader";
+import { prisma } from "@/lib/prisma";
+import { formatOrderCode } from "@/lib/utils";
 import {
   CheckCircle,
   Package,
@@ -12,6 +14,7 @@ import {
 } from "lucide-react";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export default async function GraciasPage({
   params,
@@ -25,8 +28,13 @@ export default async function GraciasPage({
   const pay = typeof sp.pay === "string" ? sp.pay : "";
   const isTransfer = pay === "transfer";
 
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { orderNumber: true },
+  });
+  const orderCode = order ? formatOrderCode(order.orderNumber) : orderId;
 
-  const whatsappLink = `https://wa.me/541170660569?text=Hola!%20Tengo%20una%20consulta%20sobre%20mi%20pedido%20${orderId}`;
+  const whatsappLink = `https://wa.me/541170660569?text=Hola!%20Tengo%20una%20consulta%20sobre%20mi%20pedido%20${orderCode}`;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-white to-conquer-pink/5 py-12">
@@ -45,7 +53,7 @@ export default async function GraciasPage({
               ¡Gracias por elegir Grabados Conquer!
             </h1>
             <p className="mt-2 text-lg font-semibold text-conquer-orange">
-              Tu pedido #{orderId} fue creado con éxito.
+              Tu pedido {orderCode} fue creado con éxito.
             </p>
 
             {/* Mensaje según método de pago */}

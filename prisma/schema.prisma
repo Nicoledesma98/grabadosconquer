@@ -287,9 +287,10 @@ model SupplierProduct {
 }
 
 model Order {
-  id     String      @id @default(cuid())
-  userId String?
-  status OrderStatus @default(PENDING)
+  id          String      @id @default(cuid())
+  orderNumber Int         @default(autoincrement()) @unique
+  userId      String?
+  status      OrderStatus @default(PENDING)
 
   subtotalNet Int @default(0)
   vatRate     Int @default(21) //porcentaje

@@ -25,7 +25,7 @@ function normalizeMinQtyStep(v: any) {
 }
 function normalizeMinPurchaseQty(v: any) {
   const n = Number(v);
-  return [1, 10, 25, 50, 75, 100].includes(n) ? n : 1;
+  return [1, 5, 10, 25, 50, 75, 100].includes(n) ? n : 1;
 }
 // Métodos válidos
 const ALLOWED_METHODS = ["DTF", "DTG", "FULL_COLOR", "LASER"] as const;
