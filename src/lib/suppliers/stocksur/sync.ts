@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { StockSurRow, StockSurVariant } from "@/lib/suppliers/stocksur/client";
 
-
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -11,6 +10,10 @@ function slugify(text: string): string {
     .replace(/\s+/g, "-")
     .replace(/--+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function normalizeExternalSku(value: string | null | undefined): string {
+  return String(value ?? "").trim().toUpperCase();
 }
 
 export async function getUniqueSlug(baseName: string, existingId?: string): Promise<string> {
@@ -71,10 +74,25 @@ type ImportContext = {
 };
 
 export async function importNewStockSurRow(row: StockSurRow, ctx: ImportContext) {
-  // Buscar o crear producto interno por slug legado o nombre
-  let product = await prisma.product.findUnique({
-    where: { slug: `sur-${row.externalSku}` },
-  });
+  // Buscar producto ya vinculado por algún SKU de variante externa
+  const externalVariantSkus = row.variants
+    .map((v) => normalizeExternalSku(v.sku))
+    .filter(Boolean);
+
+  const existingLink = externalVariantSkus.length
+    ? await prisma.supplierProduct.findFirst({
+        where: {
+          supplierId: ctx.supplierId,
+          externalSku: { in: externalVariantSkus },
+          productId: { not: null },
+        },
+        include: {
+          product: true,
+        },
+      })
+    : null;
+
+  let product = existingLink?.product ?? null;
 
   if (!product) {
     const friendlySlug = await getUniqueSlug(row.name);
@@ -88,6 +106,14 @@ export async function importNewStockSurRow(row: StockSurRow, ctx: ImportContext)
         categories: {
           connect: [{ id: ctx.novedadesCategoryId }],
         },
+      },
+    });
+  } else {
+    await prisma.product.update({
+      where: { id: product.id },
+      data: {
+        name: row.name,
+        description: row.description || null,
       },
     });
   }
@@ -120,6 +146,8 @@ async function importOrUpdateVariant(
   varRow: StockSurVariant,
   ctx: ImportContext
 ) {
+  const normalizedSku = normalizeExternalSku(varRow.sku);
+
   const finalPriceCents = calculateFinalPriceInCents(
     varRow.netPrice,
     ctx.exchangeRate,
@@ -128,6 +156,8 @@ async function importOrUpdateVariant(
 
   const colorName = varRow.color?.name || "Sin color";
   const colorHex = varRow.color?.hexCode || null;
+
+  let wasCreated = false;
 
   let variant =
     (varRow.externalId
@@ -141,75 +171,75 @@ async function importOrUpdateVariant(
     (await prisma.productVariant.findFirst({
       where: {
         productId,
-        sku: varRow.sku,
+        sku: normalizedSku,
       },
     })) ||
     (await prisma.productVariant.findUnique({
       where: {
-        sku: varRow.sku,
+        sku: normalizedSku,
       },
     }));
-
-  let imageCreated = false;
 
   if (!variant) {
     variant = await prisma.productVariant.create({
       data: {
         productId,
-        sku: varRow.sku,
+        sku: normalizedSku,
         externalVariantId: varRow.externalId,
         colorName,
         colorHex,
-        stock: 0, // ✅ stock propio, no proveedor
+        stock: 0,
         priceOverride: finalPriceCents,
       },
     });
 
-    const mainImageUrl = buildMainImageUrl(varRow);
-    if (mainImageUrl) {
-      const existingImage = await prisma.productImage.findFirst({
-        where: {
-          productId,
-          variantId: variant.id,
-          sort: 0,
-        },
-      });
-
-      if (!existingImage) {
-        await prisma.productImage.create({
-          data: {
-            productId,
-            variantId: variant.id,
-            url: mainImageUrl,
-            alt: row.name,
-            sort: 0,
-          },
-        });
-
-        imageCreated = true;
-      }
-    }
+    wasCreated = true;
   } else {
-    await prisma.productVariant.update({
+    variant = await prisma.productVariant.update({
       where: { id: variant.id },
       data: {
         productId,
-        sku: varRow.sku,
+        sku: normalizedSku,
         externalVariantId: varRow.externalId,
         priceOverride: finalPriceCents,
         colorName,
         colorHex,
-        // ✅ NO tocar stock acá
       },
     });
   }
 
-  // ✅ mapear cada variante externa por SU propio SKU
+  let imageCreated = false;
+
+  const mainImageUrl = buildMainImageUrl(varRow);
+  if (mainImageUrl) {
+    const existingImage = await prisma.productImage.findFirst({
+      where: {
+        productId,
+        variantId: variant.id,
+        sort: 0,
+      },
+    });
+
+    if (!existingImage) {
+      await prisma.productImage.create({
+        data: {
+          productId,
+          variantId: variant.id,
+          url: mainImageUrl,
+          alt: row.name,
+          sort: 0,
+        },
+      });
+
+      imageCreated = true;
+    }
+  }
+
   await prisma.supplierProduct.upsert({
     where: {
       supplierId_externalSku: {
         supplierId: ctx.supplierId,
-        externalSku: varRow.sku,
+        externalSku: normalizedSku,
       },
     },
     update: {
@@ -226,7 +256,7 @@ async function importOrUpdateVariant(
       productId,
       variantId: variant.id,
       externalId: varRow.externalId,
-      externalSku: varRow.sku,
+      externalSku: normalizedSku,
       name: `${row.name} - ${colorName}`,
       supplierStock: varRow.stock,
       supplierPrice: finalPriceCents,
@@ -235,7 +265,7 @@ async function importOrUpdateVariant(
   });
 
   return {
-    status: variant ? "updated" as const : "created" as const,
+    status: wasCreated ? ("created" as const) : ("updated" as const),
     variantId: variant.id,
     imageCreated,
   };
@@ -261,6 +291,7 @@ function buildMainImageUrl(varRow: StockSurVariant) {
   const encodedUrl = encodeURIComponent(imageUrl);
   return `https://res.cloudinary.com/${cloudName}/image/fetch/${encodedUrl}`;
 }
+
 type PriceRule = {
   min: number;
   max: number;
@@ -346,16 +377,19 @@ export async function syncStockAndPriceRow(row: StockSurRow, ctx: SyncContext) {
     skippedVariants: skipped,
   };
 }
+
 async function syncVariantStockAndPriceOnly(
   row: StockSurRow,
   varRow: StockSurVariant,
   ctx: SyncContext
 ) {
+  const normalizedSku = normalizeExternalSku(varRow.sku);
+
   const supplierProduct = await prisma.supplierProduct.findUnique({
     where: {
       supplierId_externalSku: {
         supplierId: ctx.supplierId,
-        externalSku: varRow.sku,
+        externalSku: normalizedSku,
       },
     },
     include: {
@@ -364,10 +398,9 @@ async function syncVariantStockAndPriceOnly(
     },
   });
 
-  // Si no está mapeada esa variante externa, no tocar nada
   if (!supplierProduct || !supplierProduct.productId || !supplierProduct.variantId) {
     return {
-      externalSku: varRow.sku,
+      externalSku: normalizedSku,
       status: "skipped_not_linked" as const,
     };
   }
@@ -381,7 +414,6 @@ async function syncVariantStockAndPriceOnly(
   const colorName = varRow.color?.name || "Sin color";
   const colorHex = varRow.color?.hexCode || null;
 
-  // ✅ actualizar variante interna SIN tocar stock propio
   await prisma.productVariant.update({
     where: { id: supplierProduct.variantId },
     data: {
@@ -389,11 +421,9 @@ async function syncVariantStockAndPriceOnly(
       colorName,
       colorHex,
       externalVariantId: varRow.externalId,
-      // NO stock
     },
   });
 
-  // ✅ actualizar stock del proveedor
   await prisma.supplierProduct.update({
     where: { id: supplierProduct.id },
     data: {
@@ -406,7 +436,7 @@ async function syncVariantStockAndPriceOnly(
   });
 
   return {
-    externalSku: varRow.sku,
+    externalSku: normalizedSku,
     status: "updated" as const,
   };
 }
