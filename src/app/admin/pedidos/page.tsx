@@ -141,9 +141,17 @@ export default async function AdminPedidosPage({
     <main className="p-6 max-w-6xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">Pedidos</h1>
-        <Link href="/productos" className="text-sm underline">
-          Ir a productos
-        </Link>
+        <div className="flex items-center gap-4">
+          <a
+            href={`/api/admin/orders/export-csv${buildUrl({ q })}`}
+            className="h-10 px-4 rounded-2xl border border-conquer-pink text-conquer-navy flex items-center justify-center hover:bg-conquer-pink/10"
+          >
+            Exportar CSV
+          </a>
+          <Link href="/productos" className="text-sm underline">
+            Ir a productos
+          </Link>
+        </div>
       </div>
 
       {/* 🔎 BUSCADOR */}
