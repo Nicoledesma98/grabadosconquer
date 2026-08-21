@@ -122,12 +122,21 @@ export default async function AdminProductosPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">Admin · Productos</h1>
 
-        <Link
-          href="/admin/productos/nuevo"
-          className="h-10 px-4 rounded-2xl bg-black text-white flex items-center justify-center"
-        >
-          Nuevo producto
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/admin/productos/importar-csv"
+            className="h-10 px-4 rounded-2xl border border-conquer-pink text-conquer-navy flex items-center justify-center hover:bg-conquer-pink/10"
+          >
+            Carga masiva (CSV)
+          </Link>
+
+          <Link
+            href="/admin/productos/nuevo"
+            className="h-10 px-4 rounded-2xl bg-black text-white flex items-center justify-center"
+          >
+            Nuevo producto
+          </Link>
+        </div>
       </div>
 
       {/* Buscador + filtros */}

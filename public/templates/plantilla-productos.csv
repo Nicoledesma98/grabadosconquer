@@ -1,0 +1,4 @@
+slug,name,description,active,baseUsdPrice,stock,categorias,sku,variantColorName,variantColorHex,variantStock,variantPriceOverride
+mate-imperial-grabado,Mate Imperial Grabado,Mate de alpaca con grabado laser personalizado,true,12.5,20,tazas-y-mates,,,,,
+llavero-acrilico-grabado,Llavero Acrilico Grabado,,true,3.9,,accesorios,LLAV-NEGRO,Negro,#000000,15,
+llavero-acrilico-grabado,,,,,,,LLAV-BLANCO,Blanco,#FFFFFF,10,
