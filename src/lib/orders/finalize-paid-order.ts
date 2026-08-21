@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mailer";
 import { renderOrderCreatedEmail } from "@/lib/email/templates";
+import { sendMetaCapiEvent } from "@/lib/meta-capi";
 
 export async function finalizePaidOrder(orderId: string) {
   const order = await prisma.$transaction(
@@ -313,6 +314,33 @@ export async function finalizePaidOrder(orderId: string) {
     }
   } catch (e) {
     console.error("EMAIL_AFTER_PAYMENT_ERROR", e);
+  }
+
+  try {
+    const appUrl = process.env.APP_URL || "https://grabadosconquer.com.ar";
+
+    await sendMetaCapiEvent({
+      eventName: "Purchase",
+      eventId: order.id,
+      eventSourceUrl: `${appUrl}/gracias/${order.id}`,
+      user: {
+        email: order.customerEmail,
+        phone: order.customerPhone,
+        fullName: order.customerName,
+        city: order.shipLocality,
+        zip: order.shipPostalCode,
+        country: "ar",
+      },
+      customData: {
+        currency: "ARS",
+        value: order.total,
+        content_ids: order.items.map((it) => it.variantSku || it.productId),
+        content_type: "product",
+        num_items: order.items.reduce((acc, it) => acc + it.qty, 0),
+      },
+    });
+  } catch (e) {
+    console.error("META_CAPI_PURCHASE_ERROR", e);
   }
 
   return order;
