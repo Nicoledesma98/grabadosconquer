@@ -11,8 +11,19 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
   const url = String(body.url ?? "").trim();
   const alt = body.alt ? String(body.alt).trim() : null;
+  const variantId = body.variantId ? String(body.variantId).trim() : null;
 
   if (!url) return Response.json({ error: "URL requerida" }, { status: 400 });
+
+  if (variantId) {
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: variantId },
+      select: { productId: true },
+    });
+    if (!variant || variant.productId !== productId) {
+      return Response.json({ error: "Variante no encontrada" }, { status: 404 });
+    }
+  }
 
   // sort = último + 1
   const last = await prisma.productImage.findFirst({
@@ -22,8 +33,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   });
 
   const img = await prisma.productImage.create({
-    data: { productId, url, alt, sort: (last?.sort ?? 0) + 1 },
-    select: { id: true, url: true, alt: true, sort: true },
+    data: { productId, url, alt, variantId, sort: (last?.sort ?? 0) + 1 },
+    select: { id: true, url: true, alt: true, sort: true, variantId: true },
   });
 
   return Response.json(img);
@@ -60,6 +71,37 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const imageId = String(body.imageId ?? "");
 
   if (!imageId) return Response.json({ error: "imageId requerido" }, { status: 400 });
+
+  const image = await prisma.productImage.findUnique({
+    where: { id: imageId },
+    select: { productId: true },
+  });
+  if (!image || image.productId !== productId) {
+    return Response.json({ error: "Imagen no encontrada" }, { status: 404 });
+  }
+
+  // asignar/quitar el color al que pertenece la imagen
+  if ("variantId" in body) {
+    const variantId = body.variantId ? String(body.variantId).trim() : null;
+
+    if (variantId) {
+      const variant = await prisma.productVariant.findUnique({
+        where: { id: variantId },
+        select: { productId: true },
+      });
+      if (!variant || variant.productId !== productId) {
+        return Response.json({ error: "Variante no encontrada" }, { status: 404 });
+      }
+    }
+
+    const updated = await prisma.productImage.update({
+      where: { id: imageId },
+      data: { variantId },
+      select: { id: true, url: true, alt: true, sort: true, variantId: true },
+    });
+
+    return Response.json(updated);
+  }
 
   const images = await prisma.productImage.findMany({
     where: { productId },

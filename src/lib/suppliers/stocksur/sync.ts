@@ -201,7 +201,7 @@ async function importOrUpdateVariant(
         productId,
         sku: normalizedSku,
         externalVariantId: varRow.externalId,
-        priceOverride: finalPriceCents,
+        ...(variant.priceLocked ? {} : { priceOverride: finalPriceCents }),
         colorName,
         colorHex,
       },
@@ -417,7 +417,7 @@ async function syncVariantStockAndPriceOnly(
   await prisma.productVariant.update({
     where: { id: supplierProduct.variantId },
     data: {
-      priceOverride: finalPriceCents,
+      ...(supplierProduct.variant?.priceLocked ? {} : { priceOverride: finalPriceCents }),
       colorName,
       colorHex,
       externalVariantId: varRow.externalId,

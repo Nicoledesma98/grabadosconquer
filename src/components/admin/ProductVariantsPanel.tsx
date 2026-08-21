@@ -9,6 +9,7 @@ type Variant = {
   colorHex: string | null;
   stock: number;
   priceOverride: number | null;
+  priceLocked: boolean;
 };
 
 export default function ProductVariantsPanel({ productId }: { productId: string }) {
@@ -75,7 +76,9 @@ export default function ProductVariantsPanel({ productId }: { productId: string 
     <section className="rounded-2xl border p-5">
       <div className="text-lg font-semibold">Variantes (color / SKU / stock)</div>
       <div className="text-sm text-neutral-600 mt-1">
-        Cada color = SKU distinto + stock distinto.
+        Cada color = SKU distinto + stock distinto. Si el color está vinculado a un proveedor, el
+        precio se actualiza solo en cada sync — activá "Precio manual" para protegerlo y cargarlo
+        vos mismo/a.
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-4">
@@ -143,6 +146,30 @@ export default function ProductVariantsPanel({ productId }: { productId: string 
                   defaultValue={String(v.stock)}
                   onBlur={(e) => updateVariant(v.id, { stock: Number(e.target.value) })}
                 />
+
+                <div className="flex items-center gap-1 text-sm">
+                  <span className="text-neutral-500">$</span>
+                  <input
+                    className="h-10 w-24 rounded-xl border px-2 text-sm"
+                    placeholder="auto"
+                    defaultValue={v.priceOverride != null ? String(v.priceOverride / 100) : ""}
+                    onBlur={(e) => {
+                      const raw = e.target.value.trim();
+                      const priceOverride =
+                        raw === "" ? null : Math.round(Number(raw) * 100);
+                      updateVariant(v.id, { priceOverride });
+                    }}
+                  />
+                </div>
+
+                <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                  <input
+                    type="checkbox"
+                    checked={v.priceLocked}
+                    onChange={(e) => updateVariant(v.id, { priceLocked: e.target.checked })}
+                  />
+                  Precio manual (protegido del proveedor)
+                </label>
 
                 <button
                   type="button"

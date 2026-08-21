@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireProductsAccess } from "@/lib/require-admin-sell";
+import { calculatePrice } from "@/lib/pricing";
 
 
 export const runtime = "nodejs";
@@ -188,6 +189,9 @@ const discountPercent = discountActive
   }
 
   let finalBasePrice = product.basePrice;
+  let allowUnpersonalized = product.allowUnpersonalized;
+  let unpersonalizedMultiplier: number | null = product.unpersonalizedMultiplier ?? null;
+  let unpersonalizedPrice: number | null = product.unpersonalizedPrice ?? null;
 
 if (!isSupplierProduct) {
   const exchangeRate = await getExchangeRate();
@@ -198,6 +202,29 @@ if (!isSupplierProduct) {
     exchangeRate,
     priceRules
   );
+
+  allowUnpersonalized = body.allowUnpersonalized === true;
+
+  if (allowUnpersonalized) {
+    const multiplierRaw = Number(body.unpersonalizedMultiplier);
+
+    if (!Number.isFinite(multiplierRaw) || multiplierRaw <= 0) {
+      return Response.json(
+        { error: "Ingresá un multiplicador válido para el precio sin personalizar" },
+        { status: 400 }
+      );
+    }
+
+    unpersonalizedMultiplier = multiplierRaw;
+    unpersonalizedPrice = calculatePrice(baseUsdPrice as number, exchangeRate, multiplierRaw);
+  } else {
+    unpersonalizedMultiplier = null;
+    unpersonalizedPrice = null;
+  }
+} else {
+  allowUnpersonalized = false;
+  unpersonalizedMultiplier = null;
+  unpersonalizedPrice = null;
 }
 
   const firstImg = await prisma.productImage.findFirst({
@@ -225,6 +252,9 @@ if (!isSupplierProduct) {
       active,
       stock: hasVariants ? null : stock,
       allowedMethods,
+      allowUnpersonalized,
+      unpersonalizedMultiplier,
+      unpersonalizedPrice,
       categories: { set: categoryIds.map((cid) => ({ id: cid })) },
       ...(imageUrl
         ? {
@@ -246,6 +276,9 @@ if (!isSupplierProduct) {
       stock: true,
       baseUsdPrice: true,
       basePrice: true,
+      allowUnpersonalized: true,
+      unpersonalizedMultiplier: true,
+      unpersonalizedPrice: true,
     },
   });
 

@@ -76,6 +76,132 @@ enum StockMovementType {
   SYNC
 }
 
+enum SalesChannel {
+  WEB
+  MERCADO_LIBRE
+  WHATSAPP
+}
+
+enum ImportBatchType {
+  PRODUCT_UPDATE
+  STOCK_UPDATE
+  SALES_MOVEMENTS
+  EMPLOYEE_ADJUSTMENTS
+}
+
+enum ImportBatchStatus {
+  PENDING
+  PROCESSED
+  PARTIAL
+  FAILED
+}
+
+enum ImportApplyMode {
+  APPLY
+  REGISTER_ONLY
+}
+
+enum EmployeeAdjustmentType {
+  ERROR
+  DISCOUNT
+  BREAKAGE
+  MISSING_ITEM
+  OTHER
+}
+
+enum EmployeeAdjustmentStatus {
+  PENDING
+  REVIEWED
+  APPLIED
+  CANCELED
+}
+
+model ImportBatch {
+  id           String            @id @default(cuid())
+  type         ImportBatchType
+  status       ImportBatchStatus @default(PENDING)
+  fileName     String
+  notes        String?
+  rowsTotal    Int               @default(0)
+  rowsSuccess  Int               @default(0)
+  rowsError    Int               @default(0)
+  uploadedById String?
+  processedAt  DateTime?
+  createdAt    DateTime          @default(now())
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  stockImportRows     StockImportRow[]
+  employeeAdjustments EmployeeAdjustment[]
+
+  @@index([type])
+  @@index([status])
+  @@index([uploadedById])
+  @@index([createdAt])
+}
+
+model StockImportRow {
+  id         String  @id @default(cuid())
+  batchId    String
+  productId  String?
+  variantId  String?
+  movementId String?
+
+  sku          String
+  productName  String?
+  customerName String?
+  channel      SalesChannel
+  quantity     Int
+  stockSource  StockSource
+  applyMode    ImportApplyMode @default(APPLY)
+
+  notes        String?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  batch   ImportBatch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([batchId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([sku])
+  @@index([channel])
+  @@index([createdAt])
+}
+
+model EmployeeAdjustment {
+  id          String  @id @default(cuid())
+  batchId     String?
+  productId   String?
+  variantId   String?
+  createdById String?
+
+  employeeName String
+  type         EmployeeAdjustmentType
+  status       EmployeeAdjustmentStatus @default(PENDING)
+
+  sku       String?
+  channel   SalesChannel?
+  amount    Decimal       @db.Decimal(10, 2)
+  quantity  Int?
+  reason    String?
+  notes     String?
+  createdAt DateTime      @default(now())
+
+  batch     ImportBatch?    @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  createdBy User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([employeeName])
+  @@index([productId])
+  @@index([variantId])
+  @@index([createdById])
+  @@index([createdAt])
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -87,10 +213,12 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  stockMovements StockMovement[]
-  orders         Order[]
-  accounts       Account[]
-  sessions       Session[]
+  stockMovements      StockMovement[]
+  orders              Order[]
+  accounts            Account[]
+  sessions            Session[]
+  importBatches       ImportBatch[]
+  employeeAdjustments EmployeeAdjustment[]
 }
 
 model Product {
@@ -113,7 +241,10 @@ model Product {
   discountActive  Boolean @default(false)
   discountPercent Int     @default(0)
 
-  allowedMethods PersonalizationMethod[] @default([])
+  allowedMethods           PersonalizationMethod[] @default([])
+  allowUnpersonalized      Boolean                 @default(false)
+  unpersonalizedMultiplier Float?
+  unpersonalizedPrice      Int?
 
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
@@ -123,8 +254,11 @@ model Product {
   supplierMap SupplierProduct[]
   categories  Category[]
 
-  orderItems     OrderItem[]
-  stockMovements StockMovement[]
+  orderItems          OrderItem[]
+  stockMovements      StockMovement[]
+  stockImportRows     StockImportRow[]
+  employeeAdjustments EmployeeAdjustment[]
+
   @@index([active])
   @@index([createdAt])
   @@index([active, createdAt])
@@ -152,6 +286,8 @@ model ProductVariant {
   externalVariantId String?
   // opcional si algún color tiene precio distinto
   priceOverride     Int?
+  // si está en true, los syncs de proveedor no pisan priceOverride
+  priceLocked       Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -161,8 +297,10 @@ model ProductVariant {
   // si querés imágenes por variante (opcional)
   images ProductImage[] // lo resolvemos abajo con un campo variantId
 
-  supplierMaps   SupplierProduct[]
-  stockMovements StockMovement[]
+  supplierMaps        SupplierProduct[]
+  stockMovements      StockMovement[]
+  stockImportRows     StockImportRow[]
+  employeeAdjustments EmployeeAdjustment[]
 
   @@unique([productId, externalVariantId])
   @@index([productId])
@@ -183,6 +321,7 @@ model Category {
   children  Category[] @relation("CategoryToChildren")
 
   products Product[]
+
   @@index([active, parentId])
 }
 
@@ -227,6 +366,25 @@ model PriceRule {
   @@unique([minUsd, maxUsd])
 }
 
+model HomeSlide {
+  id       String  @id @default(cuid())
+  imageUrl String
+  title    String
+  subtitle String?
+  order    Int     @default(0)
+  active   Boolean @default(true)
+
+  primaryLabel   String?
+  primaryUrl     String?
+  secondaryLabel String?
+  secondaryUrl   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, order])
+}
+
 model Setting {
   id        String   @id @default(cuid())
   key       String   @unique
@@ -236,10 +394,11 @@ model Setting {
 }
 
 model PriceTier {
-  id        String @id @default(cuid())
-  productId String
-  minQty    Int
-  price     Int // precio unitario para minQty o más
+  id         String @id @default(cuid())
+  productId  String
+  minQty     Int
+  multiplier Float?
+  price      Int // precio unitario para minQty o más
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -288,7 +447,7 @@ model SupplierProduct {
 
 model Order {
   id          String      @id @default(cuid())
-  orderNumber Int         @default(autoincrement()) @unique
+  orderNumber Int         @unique @default(autoincrement())
   userId      String?
   status      OrderStatus @default(PENDING)
 

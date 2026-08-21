@@ -37,17 +37,25 @@ type ProductDTO = {
   description: string | null;
   basePrice: number | null;
   baseUsdPrice: string | number | null;
+  allowUnpersonalized?: boolean;
+  unpersonalizedMultiplier?: number | null;
+  unpersonalizedPrice?: number | null;
   stock: number | null;
   active: boolean;
   minQtyStep?: number;
   minPurchaseQty?: number;
   discountActive?: boolean;
   discountPercent?: number;
-  images: { id: string; url: string; alt: string | null; sort: number }[];
+  images: { id: string; url: string; alt: string | null; sort: number; variantId: string | null }[];
   categories: { id: string; name: string; slug: string }[];
-  priceTiers: { id: string; minQty: number; price: number }[];
+  priceTiers: {
+    id: string;
+    minQty: number;
+    price: number;
+    multiplier: number | null;
+  }[];
   allowedMethods?: PersonalizationMethod[];
-  variants: { id: string }[]; // para saber si tiene variantes
+  variants: { id: string; colorName?: string }[]; // para saber si tiene variantes
   isSupplierProduct?: boolean;
 };
 
@@ -65,6 +73,8 @@ export default function AdminEditarProductoPage() {
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [baseUsdPrice, setBaseUsdPrice] = useState<string>("");
+  const [allowUnpersonalized, setAllowUnpersonalized] = useState(false);
+  const [unpersonalizedMultiplier, setUnpersonalizedMultiplier] = useState("");
   const [stock, setStock] = useState<string>("");
   const [active, setActive] = useState(true);
   const [minQtyStep, setMinQtyStep] = useState<number>(1);
@@ -84,10 +94,11 @@ export default function AdminEditarProductoPage() {
   const [uploading, setUploading] = useState(false);
   const [newImgUrl, setNewImgUrl] = useState("");
   const [newImgAlt, setNewImgAlt] = useState("");
+  const [uploadVariantId, setUploadVariantId] = useState<string>("");
 
   // Price Tiers
   const [tierMinQty, setTierMinQty] = useState("1");
-  const [tierPrice, setTierPrice] = useState("");
+  const [tierMultiplier, setTierMultiplier] = useState("");
 
   // UI
   const [activeTab, setActiveTab] = useState<
@@ -120,6 +131,13 @@ export default function AdminEditarProductoPage() {
         setSlug(p.slug);
         setDescription(p.description ?? "");
         setBaseUsdPrice(p.baseUsdPrice == null ? "" : String(p.baseUsdPrice));
+        setAllowUnpersonalized(p.allowUnpersonalized ?? false);
+
+        setUnpersonalizedMultiplier(
+          p.unpersonalizedMultiplier == null
+            ? ""
+            : String(p.unpersonalizedMultiplier),
+        );
         setStock(p.stock == null ? "" : String(p.stock));
         setActive(p.active);
         setMinQtyStep(p.minQtyStep ?? 1);
@@ -174,7 +192,17 @@ export default function AdminEditarProductoPage() {
           newErrors.stock = "Ingrese un número entero mayor o igual a 0";
       }
     }
+    if (allowUnpersonalized) {
+      const multiplier = Number(unpersonalizedMultiplier);
 
+      if (
+        unpersonalizedMultiplier === "" ||
+        !Number.isFinite(multiplier) ||
+        multiplier <= 0
+      ) {
+        newErrors.unpersonalizedMultiplier = "Ingresá un multiplicador válido";
+      }
+    }
     setErrors(newErrors);
     console.log("🔍 Errores de validación:", newErrors);
     return Object.keys(newErrors).length === 0;
@@ -221,6 +249,12 @@ export default function AdminEditarProductoPage() {
           minPurchaseQty,
           discountActive,
           discountPercent,
+          allowUnpersonalized,
+
+          unpersonalizedMultiplier:
+            allowUnpersonalized && unpersonalizedMultiplier !== ""
+              ? Number(unpersonalizedMultiplier)
+              : null,
         }),
       });
 
@@ -299,6 +333,7 @@ export default function AdminEditarProductoPage() {
           body: JSON.stringify({
             url: uploaded.secure_url,
             alt: name,
+            variantId: uploadVariantId || null,
           }),
         });
 
@@ -308,6 +343,7 @@ export default function AdminEditarProductoPage() {
       }
 
       setUploadFiles([]);
+      setUploadVariantId("");
       await refreshProduct();
       alert("Imágenes subidas ✅");
     } catch (error) {
@@ -327,6 +363,15 @@ export default function AdminEditarProductoPage() {
     if (res.ok) await refreshProduct();
   }
 
+  async function assignImageVariant(imageId: string, variantId: string) {
+    const res = await fetch(`/api/admin/products/${id}/images`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageId, variantId: variantId || null }),
+    });
+    if (res.ok) await refreshProduct();
+  }
+
   async function deleteImage(imageId: string) {
     if (!confirm("¿Eliminar esta imagen?")) return;
     const res = await fetch(
@@ -339,19 +384,40 @@ export default function AdminEditarProductoPage() {
   }
 
   async function addTier() {
+    const minQty = Number(tierMinQty);
+    const multiplier = Number(tierMultiplier);
+
+    if (!Number.isInteger(minQty) || minQty < 1) {
+      alert("Ingresá una cantidad mínima válida");
+      return;
+    }
+
+    if (!Number.isFinite(multiplier) || multiplier <= 0) {
+      alert("Ingresá un multiplicador válido");
+      return;
+    }
+
     const res = await fetch(`/api/admin/products/${id}/tiers`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ minQty: tierMinQty, price: tierPrice }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        minQty,
+        multiplier,
+      }),
     });
-    if (res.ok) {
-      await refreshProduct();
-      setTierMinQty("1");
-      setTierPrice("");
-    } else {
-      const payload = await res.json();
+
+    const payload = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
       alert(payload?.error || "No se pudo agregar tier");
+      return;
     }
+
+    await refreshProduct();
+    setTierMinQty("1");
+    setTierMultiplier("");
   }
 
   async function deleteTier(tierId: string) {
@@ -374,6 +440,13 @@ export default function AdminEditarProductoPage() {
     setSlug(p.slug);
     setDescription(p.description ?? "");
     setBaseUsdPrice(p.baseUsdPrice == null ? "" : String(p.baseUsdPrice));
+    setAllowUnpersonalized(p.allowUnpersonalized ?? false);
+
+    setUnpersonalizedMultiplier(
+      p.unpersonalizedMultiplier == null
+        ? ""
+        : String(p.unpersonalizedMultiplier),
+    );
     setStock(p.stock == null ? "" : String(p.stock));
     setActive(p.active);
     setMinQtyStep(p.minQtyStep ?? 1);
@@ -808,6 +881,20 @@ export default function AdminEditarProductoPage() {
                         className="object-contain p-2"
                       />
                     </div>
+                    {product.variants.length > 0 && (
+                      <select
+                        value={img.variantId ?? ""}
+                        onChange={(e) => assignImageVariant(img.id, e.target.value)}
+                        className="mb-2 h-9 w-full rounded-xl border border-conquer-pink/30 px-2 text-xs"
+                      >
+                        <option value="">General (todos los colores)</option>
+                        {product.variants.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.colorName ?? v.id}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         {img.sort === 0 && (
@@ -848,6 +935,25 @@ export default function AdminEditarProductoPage() {
                 <Upload className="h-4 w-4" />
                 Subir nueva imagen
               </h4>
+              {product.variants.length > 0 && (
+                <div className="mb-3 space-y-1">
+                  <label className="text-xs font-medium text-neutral-600">
+                    ¿A qué color pertenece?
+                  </label>
+                  <select
+                    value={uploadVariantId}
+                    onChange={(e) => setUploadVariantId(e.target.value)}
+                    className="h-10 w-full max-w-xs rounded-xl border border-conquer-pink/30 bg-white px-3 text-sm sm:w-auto"
+                  >
+                    <option value="">General (todos los colores)</option>
+                    {product.variants.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.colorName ?? v.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="flex flex-col gap-4 sm:flex-row">
                 <input
                   type="file"
@@ -911,83 +1017,207 @@ export default function AdminEditarProductoPage() {
           <div className="space-y-6 rounded-2xl border border-conquer-pink/30 bg-white p-6 shadow-sm">
             <h3 className="flex items-center gap-2 text-lg font-semibold text-conquer-navy">
               <DollarSign className="h-5 w-5" />
-              Precios por cantidad (tiers)
+              Configuración de precios
             </h3>
 
-            {product.priceTiers.length === 0 ? (
-              <div className="rounded-2xl border-2 border-dashed border-conquer-pink/30 bg-conquer-pink/5 p-8 text-center">
-                <Tag className="mx-auto h-10 w-10 text-conquer-pink/40" />
-                <p className="mt-2 text-sm text-neutral-600">
-                  No hay precios por cantidad
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                {product.priceTiers.map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between rounded-2xl border border-conquer-pink/30 bg-white p-4"
-                  >
-                    <div>
-                      <span className="text-sm font-medium text-conquer-navy">
-                        Desde {t.minQty} unidades
-                      </span>
-                      <span className="ml-4 text-lg font-bold text-conquer-orange">
-                        ${t.price}
-                      </span>
-                      <span className="ml-2 text-xs text-neutral-500">c/u</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => deleteTier(t.id)}
-                      className="rounded-full p-2 text-conquer-navy/60 hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* SIN PERSONALIZAR */}
+            <div className="space-y-3 rounded-2xl border border-conquer-pink/30 bg-conquer-pink/5 p-4">
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={allowUnpersonalized}
+                  onChange={(e) => {
+                    setAllowUnpersonalized(e.target.checked);
 
-            <div className="rounded-2xl border border-conquer-pink/30 bg-conquer-pink/5 p-5">
-              <h4 className="mb-3 text-sm font-semibold text-conquer-navy">
-                Agregar nuevo tier
-              </h4>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-neutral-500">
-                    desde
+                    if (!e.target.checked) {
+                      setUnpersonalizedMultiplier("");
+                    }
+                  }}
+                  className="h-5 w-5 rounded border-conquer-pink/30 text-conquer-orange focus:ring-conquer-orange/20"
+                />
+
+                <div>
+                  <span className="text-sm font-medium text-conquer-navy">
+                    Permitir compra sin personalizar
                   </span>
-                  <input
-                    className="h-11 w-full rounded-2xl border border-conquer-pink/30 pl-16 pr-4 outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
-                    placeholder="10"
-                    value={tierMinQty}
-                    onChange={(e) => setTierMinQty(e.target.value)}
-                    inputMode="numeric"
-                  />
+
+                  <p className="text-xs text-neutral-500">
+                    El precio se calculará usando un multiplicador específico
+                    para este producto.
+                  </p>
                 </div>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-neutral-500">
-                    precio
-                  </span>
-                  <input
-                    className="h-11 w-full rounded-2xl border border-conquer-pink/30 pl-16 pr-4 outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
-                    placeholder="11000"
-                    value={tierPrice}
-                    onChange={(e) => setTierPrice(e.target.value)}
-                    inputMode="numeric"
-                  />
+              </label>
+
+              {allowUnpersonalized && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-conquer-navy">
+                    Multiplicador sin personalizar
+                  </label>
+
+                  <div className="relative max-w-xs">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500">
+                      ×
+                    </span>
+
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={unpersonalizedMultiplier}
+                      onChange={(e) =>
+                        setUnpersonalizedMultiplier(e.target.value)
+                      }
+                      placeholder="1.30"
+                      className={`h-11 w-full rounded-2xl border pl-10 pr-4 outline-none focus:ring-2 ${
+                        errors.unpersonalizedMultiplier
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-200"
+                          : "border-conquer-pink/30 focus:border-conquer-orange focus:ring-conquer-orange/20"
+                      }`}
+                    />
+                  </div>
+
+                  {errors.unpersonalizedMultiplier && (
+                    <p className="text-xs text-red-500">
+                      {errors.unpersonalizedMultiplier}
+                    </p>
+                  )}
+
+                  {product.unpersonalizedPrice != null && (
+                    <p className="text-sm text-neutral-600">
+                      Precio actual calculado:{" "}
+                      <strong>
+                        ${product.unpersonalizedPrice.toLocaleString("es-AR")}
+                      </strong>
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            <div>
+              {/* TIERS */}
+              <div className="space-y-4">
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-conquer-navy">
+                  <Tag className="h-5 w-5" />
+                  Precios por cantidad
+                </h3>
+
+                {product.priceTiers.length === 0 ? (
+                  <div className="rounded-2xl border-2 border-dashed border-conquer-pink/30 bg-conquer-pink/5 p-8 text-center">
+                    <Tag className="mx-auto h-10 w-10 text-conquer-pink/40" />
+
+                    <p className="mt-2 text-sm text-neutral-600">
+                      No hay precios por cantidad
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {product.priceTiers.map((tier) => (
+                      <div
+                        key={tier.id}
+                        className="flex items-center justify-between rounded-2xl border border-conquer-pink/30 bg-white p-4"
+                      >
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                          <span className="text-sm font-medium text-conquer-navy">
+                            Desde {tier.minQty} unidades
+                          </span>
+
+                          {tier.multiplier != null ? (
+                            <span className="rounded-full bg-conquer-pink/10 px-3 py-1 text-sm font-medium text-conquer-navy">
+                              × {tier.multiplier}
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
+                              Precio manual anterior
+                            </span>
+                          )}
+
+                          <span className="text-lg font-bold text-conquer-orange">
+                            ${tier.price.toLocaleString("es-AR")}
+                          </span>
+
+                          <span className="text-xs text-neutral-500">c/u</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => deleteTier(tier.id)}
+                          className="rounded-full p-2 text-conquer-navy/60 hover:bg-red-50 hover:text-red-600"
+                          title="Eliminar tier"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-conquer-pink/30 bg-conquer-pink/5 p-5">
+                  <h4 className="mb-1 text-sm font-semibold text-conquer-navy">
+                    Agregar nuevo tier
+                  </h4>
+
+                  <p className="mb-4 text-xs text-neutral-500">
+                    El precio se calcula automáticamente usando el costo USD, la
+                    cotización y el multiplicador.
+                  </p>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-neutral-600">
+                        Cantidad mínima
+                      </label>
+
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-neutral-500">
+                          desde
+                        </span>
+
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={tierMinQty}
+                          onChange={(e) => setTierMinQty(e.target.value)}
+                          placeholder="50"
+                          className="h-11 w-full rounded-2xl border border-conquer-pink/30 pl-16 pr-4 outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-neutral-600">
+                        Multiplicador
+                      </label>
+
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-neutral-500">
+                          ×
+                        </span>
+
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={tierMultiplier}
+                          onChange={(e) => setTierMultiplier(e.target.value)}
+                          placeholder="1.60"
+                          className="h-11 w-full rounded-2xl border border-conquer-pink/30 pl-10 pr-4 outline-none focus:border-conquer-orange focus:ring-2 focus:ring-conquer-orange/20"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={addTier}
+                    disabled={!tierMinQty || !tierMultiplier}
+                    className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-conquer-orange text-white shadow-md transition-all hover:scale-[1.02] hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Agregar tier
+                  </button>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={addTier}
-                disabled={!tierMinQty || !tierPrice}
-                className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-conquer-orange text-white shadow-md transition-all hover:scale-[1.02] hover:shadow-xl disabled:opacity-50"
-              >
-                <Plus className="h-4 w-4" />
-                Agregar tier
-              </button>
             </div>
           </div>
         )}

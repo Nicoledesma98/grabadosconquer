@@ -130,7 +130,7 @@ export default async function ProductoDetallePage({
       minPurchaseQty: product.minPurchaseQty ?? 1,
       discountActive: product.discountActive,
       discountPercent: product.discountPercent,
-      images: product.images.map((i) => ({ url: i.url, alt: i.alt })),
+      images: product.images.map((i) => ({ url: i.url, alt: i.alt, variantId: i.variantId })),
       priceTiers: product.priceTiers.map((t) => ({
         minQty: t.minQty,
         price: t.price,
@@ -151,6 +151,8 @@ export default async function ProductoDetallePage({
         };
       }),
       allowedMethods: product.allowedMethods,
+      allowUnpersonalized: product.allowUnpersonalized,
+      unpersonalizedPrice: product.unpersonalizedPrice,
     }}
   />
 </main>

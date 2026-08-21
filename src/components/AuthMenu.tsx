@@ -16,6 +16,7 @@ import {
   UserCircle,
   Truck,
   FolderTree,
+  Images,
   Store,
   BarChart,
   ClipboardList,
@@ -127,6 +128,15 @@ export default function AuthButton() {
     >
       <FolderTree className="h-4 w-4" />
       Categorías
+    </Link>
+
+    <Link
+      href="/admin/slides"
+      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-conquer-navy hover:bg-conquer-pink/20 transition-colors"
+      onClick={() => setOpen(false)}
+    >
+      <Images className="h-4 w-4" />
+      Carrousel de inicio
     </Link>
 
     <Link

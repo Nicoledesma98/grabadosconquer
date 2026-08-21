@@ -121,7 +121,7 @@ export async function POST(req: Request) {
                   varRow.supplierPrice !== row.supplierPrice ? varRow.supplierPrice : null,
               },
             });
-          } else {
+          } else if (!variant.priceLocked) {
             await prisma.productVariant.update({
               where: { id: variant.id },
               data: {
@@ -129,6 +129,11 @@ export async function POST(req: Request) {
                 priceOverride:
                   varRow.supplierPrice !== row.supplierPrice ? varRow.supplierPrice : null,
               },
+            });
+          } else {
+            await prisma.productVariant.update({
+              where: { id: variant.id },
+              data: { stock: varRow.supplierStock },
             });
           }
 

@@ -20,10 +20,25 @@ const categories = await prisma.category.findMany({
   },
 });
 
+  const slides = await prisma.homeSlide.findMany({
+    where: { active: true },
+    orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      imageUrl: true,
+      title: true,
+      subtitle: true,
+      primaryLabel: true,
+      primaryUrl: true,
+      secondaryLabel: true,
+      secondaryUrl: true,
+    },
+  });
+
   return (
     <main className="py-8">
       <div className="w-full">
-        <HomeSlider />
+        <HomeSlider slides={slides} />
       </div>
       <HomeBenefits />
       <div className="mx-auto max-w-6xl px-4">

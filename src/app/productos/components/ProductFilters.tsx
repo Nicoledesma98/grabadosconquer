@@ -86,6 +86,15 @@ export default function ProductFilters({
   }, [initialFilters.cat, parentCategories]);
 
   const [openParents, setOpenParents] = useState<Set<string>>(initiallyOpen);
+  const [open, setOpen] = useState(false);
+
+  const activeFilterCount = [
+    initialFilters.q,
+    initialFilters.cat,
+    initialFilters.minPrice != null,
+    initialFilters.maxPrice != null,
+    initialFilters.inStock,
+  ].filter(Boolean).length;
 
   function toggleParent(id: string) {
     setOpenParents((prev) => {
@@ -120,12 +129,32 @@ export default function ProductFilters({
 
   return (
     <div className="rounded-3xl border border-conquer-pink/30 bg-white p-5 shadow-sm">
-      <div className="flex items-center gap-2 border-b border-conquer-pink/20 pb-3">
-        <Filter className="h-5 w-5 text-conquer-orange" />
-        <h2 className="text-base font-semibold text-conquer-navy">Filtros</h2>
-      </div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 border-b border-conquer-pink/20 pb-3 lg:pointer-events-none"
+      >
+        <span className="flex items-center gap-2">
+          <Filter className="h-5 w-5 text-conquer-orange" />
+          <h2 className="text-base font-semibold text-conquer-navy">Filtros</h2>
+          {activeFilterCount > 0 && (
+            <span className="rounded-full bg-conquer-orange px-2 py-0.5 text-xs font-semibold text-white">
+              {activeFilterCount}
+            </span>
+          )}
+        </span>
+        <ChevronDown
+          className={`h-5 w-5 text-conquer-navy transition-transform lg:hidden ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
 
-      <form action="/productos" method="GET" className="mt-4 space-y-5">
+      <form
+        action="/productos"
+        method="GET"
+        className={`mt-4 space-y-5 ${open ? "block" : "hidden"} lg:block`}
+      >
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm font-medium text-conquer-navy">
             <Search className="h-4 w-4" />

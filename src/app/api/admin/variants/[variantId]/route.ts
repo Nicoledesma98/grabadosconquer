@@ -20,6 +20,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ variantId
   if (body.stock != null) data.stock = Math.max(0, Number(body.stock));
   if (body.priceOverride != null)
     data.priceOverride = body.priceOverride === "" ? null : Math.max(0, Number(body.priceOverride));
+  if (body.priceLocked != null) data.priceLocked = Boolean(body.priceLocked);
 
   const updated = await prisma.productVariant.update({
     where: { id: variantId },

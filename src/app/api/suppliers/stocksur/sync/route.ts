@@ -212,7 +212,7 @@ export async function POST(req: Request) {
             data: {
               colorName,
               colorHex,
-              priceOverride: finalPriceCents,
+              ...(variant.priceLocked ? {} : { priceOverride: finalPriceCents }),
               externalVariantId: varRow.sku, // ✅ usamos SKU externo
             },
           });
