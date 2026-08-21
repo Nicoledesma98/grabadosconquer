@@ -1,5 +1,6 @@
 import Link from "next/link";
 import TransferProofUploader from "@/components/checkout/TransferProofUploader";
+import MetaPixelPurchase from "@/components/MetaPixelPurchase";
 import { prisma } from "@/lib/prisma";
 import { formatOrderCode } from "@/lib/utils";
 import {
@@ -30,7 +31,7 @@ export default async function GraciasPage({
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { orderNumber: true },
+    select: { orderNumber: true, total: true },
   });
   const orderCode = order ? formatOrderCode(order.orderNumber) : orderId;
 
@@ -38,6 +39,7 @@ export default async function GraciasPage({
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-white to-conquer-pink/5 py-12">
+      {order && <MetaPixelPurchase orderId={orderId} value={order.total} currency="ARS" />}
       <div className="mx-auto max-w-4xl px-4">
         {/* Tarjeta principal */}
         <div className="overflow-hidden rounded-3xl border border-conquer-pink/30 bg-white shadow-xl">

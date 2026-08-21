@@ -6,6 +6,7 @@ import { Raleway, Bebas_Neue } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import WhatsappFloat from "@/components/WhatsappFloat";
 import Footer from "@/components/Footer";
+import MetaPixel from "@/components/MetaPixel";
 
 const raleway = Raleway({
   subsets: ["latin"],
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es">
       <body className={`${raleway.variable} ${bebas.variable}`}>
+        <MetaPixel />
         <Providers>
           <Navbar />
           {children}

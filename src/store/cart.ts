@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { trackMetaPixel } from "@/lib/meta-pixel";
 
 export type PersonalizationMethod = "DTF" | "DTG" | "FULL_COLOR" | "LASER";
 
@@ -60,6 +61,14 @@ export const useCart = create<CartState>()(
   const q = ceilToStep(qty, step);
 
   const key = makeKey(item);
+
+  trackMetaPixel("AddToCart", {
+    content_ids: [item.variantSku || item.productId],
+    content_name: item.name,
+    content_type: "product",
+    value: item.unitPrice * q,
+    currency: "ARS",
+  });
 
   const items = get().items;
   const existing = items.find((i) => i.key === key);

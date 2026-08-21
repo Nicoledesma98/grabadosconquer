@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useCart } from "@/store/cart";
 import { unitPriceForQty, type PriceTier } from "@/lib/pricing";
+import { trackMetaPixel } from "@/lib/meta-pixel";
 import {
   Tag,
   SwatchBook,
@@ -39,7 +40,7 @@ type ProductDTO = {
   description: string | null;
   basePrice: number | null;
   stock?: number | null;
-  images: { url: string; alt: string | null }[];
+  images: { url: string; alt: string | null; variantId?: string | null }[];
   priceTiers: PriceTier[];
   categories?: { id: string; name: string; slug: string }[];
   variants?: VariantDTO[];
@@ -48,6 +49,8 @@ type ProductDTO = {
   minPurchaseQty?: number | null;
   discountActive?: boolean;
   discountPercent?: number;
+  allowUnpersonalized?: boolean;
+  unpersonalizedPrice?: number | null;
 };
 
 function formatARS(value: number) {
@@ -69,18 +72,29 @@ const [qty, setQty] = useState(initialQty);
   const addItem = useCart((s) => s.addItem);
 
   const allowed = product.allowedMethods ?? [];
+  const canUnpersonalize =
+    product.allowUnpersonalized === true && product.unpersonalizedPrice != null;
   const [method, setMethod] = useState<PersonalizationMethod | null>(allowed[0] ?? null);
+  const [unpersonalized, setUnpersonalized] = useState(allowed.length === 0 && canUnpersonalize);
 
   const variants = product.variants ?? [];
   const [variantId, setVariantId] = useState<string>(variants[0]?.id ?? "");
-
-  const imgs = product.images?.length ? product.images : [];
-  const activeImg = imgs[activeIdx]?.url ?? null;
 
   const selectedVariant = useMemo(() => {
     if (!variants.length) return null;
     return variants.find((v) => v.id === variantId) ?? variants[0] ?? null;
   }, [variants, variantId]);
+
+  const allImgs = product.images?.length ? product.images : [];
+  const variantImgs = selectedVariant
+    ? allImgs.filter((img) => img.variantId === selectedVariant.id)
+    : [];
+  const imgs = variantImgs.length > 0 ? variantImgs : allImgs.filter((img) => !img.variantId);
+  const activeImg = imgs[activeIdx]?.url ?? null;
+
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [selectedVariant?.id]);
 
   const stock = selectedVariant?.stock ?? product.stock ?? null;
 
@@ -96,10 +110,12 @@ const [qty, setQty] = useState(initialQty);
     return product.basePrice ?? 0;
   }, [selectedVariant, product.basePrice]);
 
-  const unitPrice = useMemo(
-    () => unitPriceForQty(product.priceTiers ?? [], basePriceInPesos, qty),
-    [product.priceTiers, basePriceInPesos, qty]
-  );
+  const usingUnpersonalized = unpersonalized && canUnpersonalize;
+
+  const unitPrice = useMemo(() => {
+    if (usingUnpersonalized) return product.unpersonalizedPrice ?? 0;
+    return unitPriceForQty(product.priceTiers ?? [], basePriceInPesos, qty);
+  }, [usingUnpersonalized, product.priceTiers, product.unpersonalizedPrice, basePriceInPesos, qty]);
   const hasDiscount =
   product.discountActive === true &&
   (product.discountPercent ?? 0) > 0;
@@ -117,6 +133,17 @@ useEffect(() => {
   });
 }, [step, minPurchaseQty, initialQty]);
 
+useEffect(() => {
+  trackMetaPixel("ViewContent", {
+    content_ids: [product.id],
+    content_name: product.name,
+    content_type: "product",
+    value: basePriceInPesos,
+    currency: "ARS",
+  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [product.id]);
+
   useEffect(() => {
     if (maxQty === 0) {
       setQty(initialQty);
@@ -133,16 +160,18 @@ useEffect(() => {
   const total = discountedUnitPrice * qty;
 
   const nextTier = useMemo(() => {
+    if (usingUnpersonalized) return null;
     const tiers = [...(product.priceTiers ?? [])].sort((a, b) => a.minQty - b.minQty);
     return tiers.find((t) => t.minQty > qty) ?? null;
-  }, [product.priceTiers, qty]);
+  }, [usingUnpersonalized, product.priceTiers, qty]);
 
   const currentTier = useMemo(() => {
+    if (usingUnpersonalized) return null;
     const tiers = [...(product.priceTiers ?? [])].sort((a, b) => a.minQty - b.minQty);
     let cur: PriceTier | null = null;
     for (const t of tiers) if (qty >= t.minQty) cur = t;
     return cur;
-  }, [product.priceTiers, qty]);
+  }, [usingUnpersonalized, product.priceTiers, qty]);
 
   const exceedsStock =
     typeof stock === "number" ? qty > maxQty : false
@@ -164,7 +193,7 @@ useEffect(() => {
         unitPrice: discountedUnitPrice,
         originalUnitPrice: hasDiscount ? unitPrice : null,
         discountPercent: hasDiscount ? (product.discountPercent ?? 0) : null,
-        method,
+        method: usingUnpersonalized ? null : method,
         minQtyStep: step,
         variantId: selectedVariant?.id ?? null,
         variantSku: selectedVariant?.sku ?? null,
@@ -189,8 +218,8 @@ useEffect(() => {
     );
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <div className="grid gap-8 lg:grid-cols-2">
+    <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+      <div className="grid gap-6 sm:gap-8 lg:grid-cols-2">
         <section className="space-y-4">
           <div className="group relative aspect-square overflow-hidden rounded-3xl border-2 border-conquer-pink bg-white shadow-md transition-shadow hover:shadow-lg">
             <div className="absolute inset-0 bg-conquer-pink/5 opacity-0 transition-opacity group-hover:opacity-100" />
@@ -239,12 +268,12 @@ useEffect(() => {
 
         <section className="space-y-5">
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold text-conquer-navy lg:text-4xl">{product.name}</h1>
+            <h1 className="text-2xl font-bold text-conquer-navy sm:text-3xl lg:text-4xl">{product.name}</h1>
             <p className="text-xs text-neutral-500 display-none">SKU: {product.slug}</p>
           </div>
 
-          <div className="rounded-3xl border-2 border-conquer-pink bg-gradient-to-br from-white to-conquer-pink/5 p-6 shadow-lg">
-            <div className="flex items-center justify-between gap-4">
+          <div className="rounded-3xl border-2 border-conquer-pink bg-gradient-to-br from-white to-conquer-pink/5 p-4 shadow-lg sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <span className="text-sm font-medium text-neutral-500">Precio unitario</span>
                 <div className="mt-1 flex items-baseline gap-2">
@@ -256,7 +285,7 @@ useEffect(() => {
   )}
 
   <div className="flex flex-wrap items-baseline gap-2">
-    <span className="text-3xl font-bold text-conquer-navy">
+    <span className="text-2xl font-bold text-conquer-navy sm:text-3xl">
       {formatARS(discountedUnitPrice)}
     </span>
 
@@ -267,20 +296,26 @@ useEffect(() => {
     )}
   </div>
 </div>
-                  {currentTier && (
+                  {usingUnpersonalized ? (
                     <span className="rounded-full bg-conquer-turq/20 px-2 py-1 text-xs font-medium text-conquer-navy">
-                      {currentTier.minQty}+
+                      Sin personalizar
                     </span>
+                  ) : (
+                    currentTier && (
+                      <span className="rounded-full bg-conquer-turq/20 px-2 py-1 text-xs font-medium text-conquer-navy">
+                        {currentTier.minQty}+
+                      </span>
+                    )
                   )}
                 </div>
               </div>
-              <div className="text-right">
+              <div className="sm:text-right">
                 <span className="text-sm font-medium text-neutral-500">Total</span>
-                <div className="mt-1 text-2xl font-bold text-conquer-orange lg:text-3xl">
+                <div className="mt-1 text-xl font-bold text-conquer-orange sm:text-2xl lg:text-3xl">
                   {formatARS(total)}
                   <span className="text-xs text-neutral-500">+ IVA</span>
                 </div>
-                
+
               </div>
             </div>
 
@@ -346,38 +381,52 @@ useEffect(() => {
               </div>
             )}
 
-            {(product.priceTiers?.length ?? 0) > 0 && (
-              <div className="mt-5">
-                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-conquer-navy">
-                  <Tag className="h-4 w-4" />
-                  Precios por volumen
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {[...(product.priceTiers ?? [])]
-                    .sort((a, b) => a.minQty - b.minQty)
-                    .map((tier) => {
-                      const isActive = qty >= tier.minQty;
-                      return (
-                        <div
-                          key={tier.minQty}
-                          className={`rounded-xl border-2 p-2 text-center transition-all ${
-                            isActive
-                              ? "border-conquer-turq bg-conquer-turq/10 shadow-sm"
-                              : "border-conquer-pink/30 bg-white opacity-70"
-                          }`}
-                        >
-                          <div className="text-xs font-medium text-neutral-500">
-                            desde {tier.minQty}u
-                          </div>
-                          <div className="text-base font-bold text-conquer-navy">
-                            {formatARS(tier.price)}
-                          </div>
-                          <div className="text-[10px] text-neutral-400">c/u</div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
+            {!usingUnpersonalized && (product.priceTiers?.length ?? 0) > 0 && (
+              <div className="overflow-hidden rounded-xl border border-conquer-pink/30 bg-white">
+  {[...(product.priceTiers ?? [])]
+    .sort((a, b) => a.minQty - b.minQty)
+    .map((tier, index, tiers) => {
+      const isActive = qty >= tier.minQty;
+
+      return (
+        <div
+          key={tier.minQty}
+          className={`flex items-center justify-between gap-4 px-4 py-3 transition-all ${
+            index < tiers.length - 1
+              ? "border-b border-conquer-pink/20"
+              : ""
+          } ${
+            isActive
+              ? "bg-conquer-turq/10"
+              : "bg-white opacity-70"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className={`h-2.5 w-2.5 rounded-full ${
+                isActive
+                  ? "bg-conquer-turq"
+                  : "bg-neutral-300"
+              }`}
+            />
+
+            <span className="text-sm font-medium text-neutral-600">
+              Desde {tier.minQty} unidades
+            </span>
+          </div>
+
+          <div className="text-right">
+            <span className="text-base font-bold text-conquer-navy">
+              {formatARS(tier.price)}
+            </span>
+            <span className="ml-1 text-xs text-neutral-400">
+              c/u
+            </span>
+          </div>
+        </div>
+      );
+    })}
+</div>
             )}
 
             <button
@@ -421,15 +470,15 @@ useEffect(() => {
             </div>
           </div>
 
-          {allowed.length > 0 && (
-            <div className="rounded-3xl border border-conquer-pink bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+          {(allowed.length > 0 || canUnpersonalize) && (
+            <div className="rounded-3xl border border-conquer-pink bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
               <div className="flex items-center gap-2 border-b border-conquer-pink/20 pb-3">
                 <Brush className="h-5 w-5 text-conquer-navy" />
                 <h3 className="font-semibold text-conquer-navy">Personalización</h3>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {allowed.map((m) => {
-                  const isSelected = m === method;
+                  const isSelected = !usingUnpersonalized && m === method;
                   const labels = {
                     DTF: "DTF",
                     DTG: "DTG",
@@ -439,7 +488,10 @@ useEffect(() => {
                   return (
                     <button
                       key={m}
-                      onClick={() => setMethod(m)}
+                      onClick={() => {
+                        setMethod(m);
+                        setUnpersonalized(false);
+                      }}
                       className={`flex items-center gap-1.5 rounded-full border-2 px-4 py-2 text-sm font-medium transition-all ${
                         isSelected
                           ? "border-conquer-orange bg-conquer-pink/20 text-conquer-navy shadow-sm"
@@ -451,6 +503,19 @@ useEffect(() => {
                     </button>
                   );
                 })}
+                {canUnpersonalize && (
+                  <button
+                    onClick={() => setUnpersonalized(true)}
+                    className={`flex items-center gap-1.5 rounded-full border-2 px-4 py-2 text-sm font-medium transition-all ${
+                      usingUnpersonalized
+                        ? "border-conquer-orange bg-conquer-pink/20 text-conquer-navy shadow-sm"
+                        : "border-conquer-pink/30 hover:border-conquer-turq hover:bg-conquer-pink/10"
+                    }`}
+                  >
+                    <Package className="h-4 w-4" />
+                    Sin personalizar
+                  </button>
+                )}
               </div>
               <p className="mt-3 text-xs text-neutral-500">
                 Seleccioná el método de personalización para este producto.
@@ -459,7 +524,7 @@ useEffect(() => {
           )}
 
           {variants.length > 0 && (
-            <div className="rounded-3xl border border-conquer-pink bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+            <div className="rounded-3xl border border-conquer-pink bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
               <div className="flex items-center gap-2 border-b border-conquer-pink/20 pb-3">
                 <SwatchBook className="h-5 w-5 text-conquer-navy" />
                 <h3 className="font-semibold text-conquer-navy">Colores disponibles</h3>
@@ -514,7 +579,7 @@ useEffect(() => {
           )}
 
           {product.description ? (
-            <div className="rounded-3xl border border-conquer-pink/30 bg-white p-5">
+            <div className="rounded-3xl border border-conquer-pink/30 bg-white p-4 sm:p-5">
               <h3 className="text-base font-semibold text-conquer-navy mb-2">Descripción</h3>
               <p className="text-base leading-relaxed text-neutral-700">
                 {product.description}

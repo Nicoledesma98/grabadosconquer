@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCart } from "@/store/cart";
 import { useRouter } from "next/navigation";
 import {
@@ -36,6 +36,7 @@ import {
   MapPin as MapPinIcon,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { trackMetaPixel } from "@/lib/meta-pixel";
 
 
 function formatARS(value: number) {
@@ -76,6 +77,20 @@ export default function CheckoutPage({ forceEnableMercadoPago = false,}: Checkou
   const items = useCart((s) => s.items);
   const subtotalNet = useCart((s) => s.subtotal());
   const clear = useCart((s) => s.clear);
+  const trackedInitiateCheckout = useRef(false);
+
+  useEffect(() => {
+    if (trackedInitiateCheckout.current) return;
+    if (items.length === 0) return;
+    trackedInitiateCheckout.current = true;
+
+    trackMetaPixel("InitiateCheckout", {
+      content_ids: items.map((i) => i.variantSku || i.productId),
+      num_items: items.reduce((acc, i) => acc + i.qty, 0),
+      value: items.reduce((acc, i) => acc + i.unitPrice * i.qty, 0),
+      currency: "ARS",
+    });
+  }, [items]);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
     {},
