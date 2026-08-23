@@ -1,7 +1,7 @@
 "use client";
 
-import CheckoutPage from "@/app/checkout/page";
+import CheckoutForm from "@/components/checkout/CheckoutForm";
 
 export default function CheckoutTestClient() {
-  return <CheckoutPage forceEnableMercadoPago />;
+  return <CheckoutForm forceEnableMercadoPago />;
 }

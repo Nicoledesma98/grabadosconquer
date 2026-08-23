@@ -11,7 +11,7 @@ type Role = typeof ALLOWED_ROLES[number];
 
 export async function POST(
   req: Request,
-  ctx: { params: Promise<{ id: string }> | { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   const params = await Promise.resolve(ctx.params as any);
   const targetId = String(params?.id ?? "").trim();

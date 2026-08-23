@@ -1,7 +1,12 @@
 import Link from 'next/link';
 
-export default function PagoExitosoPage({ searchParams }: { searchParams: { external_reference?: string } }) {
-  const orderId = searchParams.external_reference;
+export default async function PagoExitosoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ external_reference?: string }>;
+}) {
+  const sp = await searchParams;
+  const orderId = sp.external_reference;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">

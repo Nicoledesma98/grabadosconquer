@@ -40,7 +40,7 @@ function buildUrl(params: Record<string, string | number | undefined | null>) {
 export default async function AdminUsuariosPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; page?: string }> | { q?: string; page?: string };
+  searchParams?: Promise<{ q?: string; page?: string }>;
 }) {
   // --- Guard: solo admin ---
   const session = await getServerSession(authOptions);
@@ -58,8 +58,7 @@ export default async function AdminUsuariosPage({
     );
   }
 
-  // ✅ Next 16: searchParams puede venir como Promise
-  const sp = await Promise.resolve(searchParams ?? {});
+  const sp: { q?: string; page?: string } = searchParams ? await searchParams : {};
   const q = String(sp?.q ?? "").trim();
   const pageRaw = Number(sp?.page ?? "1");
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
