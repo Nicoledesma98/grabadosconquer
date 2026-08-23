@@ -98,7 +98,7 @@ export default function HomeSlider({ slides }: { slides?: HomeSlideDTO[] }) {
       onMouseLeave={() => setIsHovering(false)}
     >
       {/* Slides container */}
-      <div className="relative aspect-[21/9] w-full md:aspect-[21/8] lg:aspect-[21/7]">
+      <div className="relative aspect-[21/9] w-full">
         {SLIDES.map((slide, idx) => (
           <div
             key={slide.src}

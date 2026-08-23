@@ -35,6 +35,39 @@ const DEFAULT_PRIMARY_URL = "/productos";
 const DEFAULT_SECONDARY_LABEL = "Consultar";
 const DEFAULT_SECONDARY_URL = "https://wa.me/541131002011";
 
+const TARGET_RATIO = 21 / 9;
+
+function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("No se pudo leer la imagen"));
+    };
+    img.src = url;
+  });
+}
+
+async function checkAspectRatio(file: File): Promise<string | null> {
+  try {
+    const { width, height } = await getImageDimensions(file);
+    const ratio = width / height;
+    const deviation = Math.abs(ratio - TARGET_RATIO) / TARGET_RATIO;
+
+    if (deviation > 0.08) {
+      return `Tu imagen es de ${width}×${height}px (proporción ${ratio.toFixed(2)}:1). Se recomienda una proporción cercana a 21:9 (ej. 2100×900px) para que no se recorte de forma distinta en cada pantalla.`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function uploadImage(file: File): Promise<string | null> {
   try {
     const signRes = await fetch("/api/cloudinary/slide-sign", { method: "POST" });
@@ -73,6 +106,7 @@ export default function SlidesAdminClient({
   const [subtitle, setSubtitle] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageWarning, setImageWarning] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [primaryLabel, setPrimaryLabel] = useState(DEFAULT_PRIMARY_LABEL);
@@ -86,6 +120,7 @@ export default function SlidesAdminClient({
   const [editSubtitle, setEditSubtitle] = useState("");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [editImageWarning, setEditImageWarning] = useState<string | null>(null);
   const [editUploading, setEditUploading] = useState(false);
   const [editPrimaryLabel, setEditPrimaryLabel] = useState("");
   const [editPrimaryUrl, setEditPrimaryUrl] = useState("");
@@ -139,6 +174,7 @@ export default function SlidesAdminClient({
       setSubtitle("");
       setImageFile(null);
       setImagePreview(null);
+      setImageWarning(null);
       setPrimaryLabel(DEFAULT_PRIMARY_LABEL);
       setPrimaryUrl(DEFAULT_PRIMARY_URL);
       setSecondaryLabel(DEFAULT_SECONDARY_LABEL);
@@ -156,6 +192,7 @@ export default function SlidesAdminClient({
     setEditSubtitle(s.subtitle ?? "");
     setEditImagePreview(s.imageUrl);
     setEditImageFile(null);
+    setEditImageWarning(null);
     setEditPrimaryLabel(s.primaryLabel ?? DEFAULT_PRIMARY_LABEL);
     setEditPrimaryUrl(s.primaryUrl ?? DEFAULT_PRIMARY_URL);
     setEditSecondaryLabel(s.secondaryLabel ?? DEFAULT_SECONDARY_LABEL);
@@ -168,6 +205,7 @@ export default function SlidesAdminClient({
     setEditSubtitle("");
     setEditImageFile(null);
     setEditImagePreview(null);
+    setEditImageWarning(null);
     setEditPrimaryLabel("");
     setEditPrimaryUrl("");
     setEditSecondaryLabel("");
@@ -390,6 +428,7 @@ export default function SlidesAdminClient({
                     onClick={() => {
                       setImageFile(null);
                       setImagePreview(null);
+                      setImageWarning(null);
                     }}
                     className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                     title="Eliminar imagen"
@@ -414,6 +453,8 @@ export default function SlidesAdminClient({
                         if (file) {
                           setImageFile(file);
                           setImagePreview(URL.createObjectURL(file));
+                          setImageWarning(null);
+                          checkAspectRatio(file).then(setImageWarning);
                         }
                       }}
                       className="hidden"
@@ -428,6 +469,12 @@ export default function SlidesAdminClient({
                 <p className="text-xs text-neutral-500 mt-2">
                   Imagen recomendada: formato panorámico (ej. 2100x900px), JPG o PNG.
                 </p>
+
+                {imageWarning && (
+                  <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+                    ⚠ {imageWarning}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -665,6 +712,8 @@ export default function SlidesAdminClient({
                                     if (file) {
                                       setEditImageFile(file);
                                       setEditImagePreview(URL.createObjectURL(file));
+                                      setEditImageWarning(null);
+                                      checkAspectRatio(file).then(setEditImageWarning);
                                     }
                                   }}
                                   className="hidden"
@@ -677,6 +726,12 @@ export default function SlidesAdminClient({
                                 </span>
                               )}
                             </div>
+
+                            {editImageWarning && (
+                              <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+                                ⚠ {editImageWarning}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
