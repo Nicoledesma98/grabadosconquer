@@ -264,12 +264,12 @@ const isFormValid = () => {
               <div>
                 <h3 className="font-medium text-conquer-navy">WhatsApp</h3>
                 <a 
-                  href="https://wa.me/5491131002011" 
+                  href="https://wa.me/5491170660569" 
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-conquer-turq hover:underline"
                 >
-                  11 3100 2011
+                  11 7066 0569
                 </a>
               </div>
               <div>
@@ -411,7 +411,7 @@ const isFormValid = () => {
                 value={formData.phone}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                placeholder="11 3100 2011"
+                placeholder="11 7066 0569"
                 disabled={loading}
               />
               {errors.phone && (
@@ -490,7 +490,7 @@ const isFormValid = () => {
                   <li>• Verifica que todos los campos obligatorios estén completos</li>
                   <li>• Asegúrate de que el email tenga formato válido</li>
                   <li>• El mensaje debe tener al menos 10 caracteres</li>
-                  <li>• Si persiste, contáctanos por WhatsApp al 11 3100 2011</li>
+                  <li>• Si persiste, contáctanos por WhatsApp al 11 7066 0569</li>
                 </ul>
               </div>
             )}
